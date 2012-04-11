@@ -1,32 +1,48 @@
 import System.Random
 
-import Control.Monad.State
+-- | Building blocks for a definition.
+data Block = Digit0
+           | Digit1
+           | Digit2
+           | Digit3
+           | Digit4
+           | Digit5
+           | Digit6
+           | Digit7
+           | Digit8
+           | Digit9
+           | OpPlus
+           | OpMinus
+           | OpMult
+           | OpDiv
+           | Empty
+           deriving (Show, Enum)
 
---import Data.Random (runRVar)
---import Data.Random.Source.DevRandom
---import Data.Random.Extras (choice)
+-- | A definition is a series of blocks that is evaluated.
+type Def = [Block]
 
-data Block = Digit Int      -- ^ 0..9
-           | Operator Char  -- ^ +, -, /, or *
-           | Empty          -- ^ None
-           deriving (Show)
+-- | Build a new definition containing n Empty blocks.
+newdef :: Int -> Def
+newdef n = take n $ repeat Empty
 
-type DNA = [Block]
+instance Bounded Block where
+    minBound = toEnum 0
+    maxBound = last $ [minBound :: Block ..]
 
--- | Build a random DNA sequence containing n Empty blocks.
-buildDNA :: Int -> DNA
-buildDNA n = take n $ repeat Empty
+instance Random Block where
+    randomR (a,b) g = 
+        case (randomR (fromEnum a, fromEnum b) g) of
+            (x, g') -> (toEnum x, g')
+    random g = randomR (minBound, maxBound) g
 
--- | Mutate n random blocks in a DNA sequence.
---mutateDNA :: DNA -> Int -> IO [Block]
---mutateDNA dna n = sequence [randBlock | _ <- [1..10]]
---mutateDNA dna n = fmap maybeMutate . zip dna [0..]
---    where maybeMutate block i = 
+-- | Return an infinite list of random blocks.
+rblockfeed :: (RandomGen g) => g -> [Block]
+rblockfeed g = randomRs (minBound, maxBound) g
 
--- | Apply a function to n random elements in a list.
---rmap :: (RandomGen g) => IncrF a -> Int -> [a] -> g -> [a]
---rmap f n xs g = map (\(x, i) -> if i `elem` hotxs then let (x, f') = f x in x else x) $ zip xs [0..]
---    where hotxs = rpick [0..(length xs)-1] n g
+-- | Remove element at a specific index position from a list.
+lsdrop :: [a] -> Int -> [a]
+lsdrop [] _ = []
+lsdrop xs i = let (a, b) = splitAt i xs in a ++ (drop 1 b)
 
 -- | Return n random elements from a list.
 rpick :: (RandomGen g) => [a] -> Int -> g -> [a]
@@ -35,71 +51,29 @@ rpick xs n g = let (ri, g') = randomR range g
                in (xs !! ri):(rpick (lsdrop xs ri) (n-1) g')
     where range = (0, (length xs)-1)
 
--- | Remove element at a specific index position from a list.
-lsdrop :: [a] -> Int -> [a]
-lsdrop [] _ = []
-lsdrop xs i = let (a, b) = splitAt i xs in a ++ (drop 1 b)
+-- | Apply a queue of functions to n random elements in a list.
+rmap :: (RandomGen g) 
+     => [(a -> a)]      -- ^ List of map functions to apply to random elements. 
+                        --   The list of treated as a queue, popping a function, 
+                        --   applying it, then discarding it.
+     -> [a]             -- ^ List to partially, randomly map.
+     -> Int             -- ^ Number of random elements to apply function to.
+     -> g               -- ^ Random number generator.
+     -> [a]             -- ^ Partially, randomly mapped list.
+rmap _ [] _ _ = []
+rmap fs xs n g = rmap' fs (zip xs [0..])
+    where hotxs = rpick [0..(length xs)-1] n g
+          rmap' :: [(a -> a)] -> [(a, Int)] -> [a]
+          rmap' _ [] = []
+          rmap' (f:fs) ((x, i):xs)
+              | elem i hotxs  = f x:rmap' fs xs
+              | otherwise     = x:rmap' (f:fs) xs
 
--- | Return a random DNA sequence block (and incremented random generator).
-randblock :: (RandomGen g) => g -> (Block, g)
-randblock g = let (i, g') = randomR range g in (blocks !! i, g')
-    where range = (0, (length blocks)-1)
-          blocks = [ Digit 0
-                   , Digit 1
-                   , Digit 2
-                   , Digit 3
-                   , Digit 4
-                   , Digit 5
-                   , Digit 6
-                   , Digit 7
-                   , Digit 8
-                   , Digit 9
-                   , Operator '+'
-                   , Operator '-'
-                   , Operator '*'
-                   , Operator '/'
-                   ]
+-- | Convert a list of values to a list of functions that return the value. 
+functionize :: [a] -> [(a -> a)]
+functionize xs = map (\x -> (\_ -> x)) xs
 
--- | 1.
+main = return $ rmap (functionize $ rblockfeed g) (newdef 10) 7 g
+    where g = mkStdGen 99
 
-type Stack = [Int]
-
-pop :: State Stack Int
-pop = state $ \(x:xs) -> (x, xs)
-
-push :: Int -> State Stack ()
-push a = state $ \xs -> ((), a:xs)
-
-stackm :: State Stack Int
-stackm = do
-    push 3
-    push 2
-    push 1
-    pop
-
---main = return (runState (push 3 >>= (\_ -> push 2)) [])
-
--- | 2.
-
-rpop :: (RandomGen g) => State g Int
-rpop = state $ \g -> let (n, g') = randomR (0,100) g in (n, g')
-
-poplots :: (RandomGen g) => State g Int
-poplots = do
-    a <- rpop
-    b <- rpop
-    rpop
-
-main = return (runState poplots (mkStdGen 97))
-
---main = mutateDNA (buildDNA 10) 2
---main = return . take 10 $ randBlockFeed
---main = return $ rmap id 3 [1..10]
---main = return $ setmove (Set.fromList [1..5]) (Set.fromList []) 3
---main = return $ rpick [1..10] 5 (mkStdGen 104)
---main = return $ rmap (\x -> 'x') 3 ['a'..'g'] (mkStdGen 98)
---main = return $ let (i, g) = randblock (mkStdGen 97) in i
---main = return $ rmap (f g) 5 (buildDNA 10) g
---    where g = mkStdGen 40
---          f g x = let (i, g') = randblock g in (i, f g')
-
+   
