@@ -1,3 +1,4 @@
+import qualified Data.Map as Map
 import System.Random
 
 -- | Building blocks for a definition.
@@ -16,7 +17,7 @@ data Block = Digit0
            | OpMult
            | OpDiv
            | Empty
-           deriving (Show, Enum)
+           deriving (Ord, Eq, Show, Enum)
 
 -- | A definition is a series of blocks that is evaluated.
 type Def = [Block]
@@ -73,7 +74,34 @@ rmap fs xs n g = rmap' fs (zip xs [0..])
 functionize :: [a] -> [(a -> a)]
 functionize xs = map (\x -> (\_ -> x)) xs
 
-main = return $ rmap (functionize $ rblockfeed g) (newdef 10) 7 g
-    where g = mkStdGen 99
+-- DOMAIN LANGUAGE ------------------------------------------------------------
+
+-- | Map block tokens to their string counterparts in the domain language.
+blockstr = [
+    (Digit0, '0'),
+    (Digit1, '1'),
+    (Digit2, '2'),
+    (Digit3, '3'),
+    (Digit4, '4'),
+    (Digit5, '5'),
+    (Digit6, '6'),
+    (Digit7, '7'),
+    (Digit8, '8'),
+    (Digit9, '9'),
+    (OpPlus, '+'),
+    (OpMinus, '-'),
+    (OpMult, '*'),
+    (OpDiv, '/')
+    ]
+blockstrMap :: Map.Map Block Char
+blockstrMap = Map.fromList blockstr
+
+-- | Map all non-Empty blocks of a definition to their domain language counterpart
+domlang :: Def -> String
+domlang = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
+
+main = return . domlang $ def
+    where def = rmap (functionize $ rblockfeed g) (newdef 10) 7 g
+          g = mkStdGen 99
 
    
