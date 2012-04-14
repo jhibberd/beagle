@@ -1,4 +1,7 @@
+-- | Genetic Algorithm
+
 import qualified Data.Map as Map
+import Network.HTTP
 import System.Random
 
 -- | Building blocks for a definition.
@@ -20,10 +23,17 @@ data Block = Digit0
            deriving (Ord, Eq, Show, Enum)
 
 -- | A definition is a series of blocks that is evaluated.
-type Def = [Block]
+-- TODO(jhibberd) Block to Gene
+type Genotype = [Block]
+
+-- | The composite of a candidate solution's observable characteristics.
+type Phenotype = String
+
+-- | Representation of a genotype that can be evaluated by the fitness function.
+type EncodedGenotype = String
 
 -- | Build a new definition containing n Empty blocks.
-newdef :: Int -> Def
+newdef :: Int -> Genotype
 newdef n = take n $ repeat Empty
 
 instance Bounded Block where
@@ -74,7 +84,7 @@ rmap fs xs n g = rmap' fs (zip xs [0..])
 functionize :: [a] -> [(a -> a)]
 functionize xs = map (\x -> (\_ -> x)) xs
 
--- DOMAIN LANGUAGE ------------------------------------------------------------
+-- DOMAIN LANGUAGE -------------------------------------------------------------
 
 -- | Map block tokens to their string counterparts in the domain language.
 blockstr = [
@@ -96,12 +106,22 @@ blockstr = [
 blockstrMap :: Map.Map Block Char
 blockstrMap = Map.fromList blockstr
 
--- | Map all non-Empty blocks of a definition to their domain language counterpart
-domlang :: Def -> String
-domlang = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
+-- | Map all non-Empty blocks of a definition to their domain language 
+-- counterpart
+encodeGenotype :: Genotype -> EncodedGenotype
+encodeGenotype = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
 
-main = return . domlang $ def
-    where def = rmap (functionize $ rblockfeed g) (newdef 10) 7 g
-          g = mkStdGen 99
+-- | Evaluate definition using the domain server.
+evalFitness :: EncodedGenotype -> IO (EncodedGenotype, Phenotype)
+evalFitness domdef = fmap (\x -> (domdef, x)) result
+    where host = "http://localhost:1831/"
+          result = simpleHTTP (getRequest (host++domdef)) >>= getResponseBody
+
+-- MAIN ------------------------------------------------------------------------
+
+main = sequence . map (evalFitness . encodeGenotype) $ population
+    where makeGenotype g = rmap (functionize $ rblockfeed g) (newdef 10) 7 g
+          makeRandomGenotype (f, i) = f $ mkStdGen i
+          population = map makeRandomGenotype $ zip (repeat makeGenotype) [0..9]
 
    
