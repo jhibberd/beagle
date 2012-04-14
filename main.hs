@@ -1,5 +1,7 @@
 -- | Genetic Algorithm
 
+import Data.List (sortBy)
+import Data.Maybe (fromJust)
 import qualified Data.Map as Map
 import Network.HTTP
 import System.Random
@@ -26,11 +28,10 @@ data Block = Digit0
 -- TODO(jhibberd) Block to Gene
 type Genotype = [Block]
 
+type Population = [Genotype]
+
 -- | The composite of a candidate solution's observable characteristics.
 type Phenotype = String
-
--- | Representation of a genotype that can be evaluated by the fitness function.
-type EncodedGenotype = String
 
 -- | Build a new definition containing n Empty blocks.
 newdef :: Int -> Genotype
@@ -108,20 +109,61 @@ blockstrMap = Map.fromList blockstr
 
 -- | Map all non-Empty blocks of a definition to their domain language 
 -- counterpart
-encodeGenotype :: Genotype -> EncodedGenotype
+encodeGenotype :: Genotype -> String
 encodeGenotype = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
 
 -- | Evaluate definition using the domain server.
-evalFitness :: EncodedGenotype -> IO (EncodedGenotype, Phenotype)
-evalFitness domdef = fmap (\x -> (domdef, x)) result
+evalFitness :: Genotype -> IO (Genotype, Maybe Phenotype)
+evalFitness domdef = fmap (\x -> (domdef, x)) $ fmap parse result
     where host = "http://localhost:1831/"
-          result = simpleHTTP (getRequest (host++domdef)) >>= getResponseBody
+          result = simpleHTTP (getRequest (host++encodedGT)) >>= getResponseBody
+          parse ('0':xs) = Just xs
+          parse ('1':xs) = Nothing
+          encodedGT = encodeGenotype domdef
+
+-- | Calculate the deviation between the target phenotype and observed 
+-- phenotype. The deviation is a float between zero and infinity: zero meaning
+-- the candidate phenotype matched the target phenotype; infinity meaning that
+-- the candidate couldn't be evaluated and therefore had no observable 
+-- phenotype.
+calcDeviation :: (Genotype, Maybe Phenotype)
+              -> (Genotype, Maybe Phenotype, Float)
+calcDeviation (eg, p) = (eg, p, dev p)
+    where targetPT = 5
+          dev (Just observedPT) = abs (read observedPT - targetPT)
+          dev Nothing = 1/0 -- Infinity
+
+sortByDeviation :: (Ord c) => [(a, b, c)] -> [(a, b, c)]
+sortByDeviation = sortBy (\(_, _, a) (_, _, b) -> compare a b)
 
 -- MAIN ------------------------------------------------------------------------
 
-main = sequence . map (evalFitness . encodeGenotype) $ population
+-- take 1 from this
+{-
+solve :: Generation -> Genotype
+solve g = evaluateGeneration . pickMostPromisingCandidates . 
+          extractAnyPerfectCandidates . usePromisingCandidateToBuildNewGen
+          returnPerfectCandidate ++ solve newGen
+solve p = evaluateGeneration p
+-}
+
+-- TODO(jhibberd) Re-engineer all functions that accept RandomGen to also return
+-- the "incremented" RandomGen
+
+evolve :: RandomGen g
+       => IO [(Genotype, Maybe Phenotype, Float)]
+       -> g 
+       -> IO Population
+evolve p g = fmap (map (mutate . genotype)) p
+    where genotype (a, _, _) = a
+          mutate gt = rmap (functionize $ rblockfeed g) gt 7 g
+
+evalPopulation :: Population -> IO [(Genotype, Maybe Phenotype, Float)]
+evalPopulation = fmap (sortByDeviation . map calcDeviation) . 
+                 sequence . map evalFitness
+
+main = evalPopulation $ population
     where makeGenotype g = rmap (functionize $ rblockfeed g) (newdef 10) 7 g
           makeRandomGenotype (f, i) = f $ mkStdGen i
           population = map makeRandomGenotype $ zip (repeat makeGenotype) [0..9]
 
-   

@@ -1,7 +1,16 @@
+"""Environment, independent of genetic algorithm, that evaluates the fitness of
+a candiate solution, in terms of how closely its observable characteristics 
+(phenotype) match the desirable characteristics defined for the problem domain.
+"""
+
 import BaseHTTPServer
 import SocketServer
 
 PORT = 1831
+
+class Status(object):
+    Executed = 0
+    Error = 1
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
    
@@ -16,13 +25,18 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             exec(code, None, domain)
             x = domain.get('x')
+            status = Status.Executed
         except:
             x = 0
+            status = Status.Error
+        response = "%s%s" % (status, x)
+    
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
-        self.send_header("Content-Length", str(len(str(x))))
+        self.send_header("Content-Length", str(len(response)))
         self.end_headers()
-        self.wfile.write(x)
+        print response
+        self.wfile.write(response)
 
 DOMAIN = """
 def foo(x, y):
@@ -33,6 +47,4 @@ z = 10
 """
 Handler.load_domain(DOMAIN)
 httpd = SocketServer.TCPServer(("", PORT), Handler)
-
-print "serving at port", PORT
 httpd.serve_forever()
