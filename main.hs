@@ -57,10 +57,15 @@ lsdrop [] _ = []
 lsdrop xs i = let (a, b) = splitAt i xs in a ++ (drop 1 b)
 
 -- | Return n random elements from a list.
-rpick :: (RandomGen g) => [a] -> Int -> g -> [a]
-rpick _ 0 _ = []
-rpick xs n g = let (ri, g') = randomR range g 
-               in (xs !! ri):(rpick (lsdrop xs ri) (n-1) g')
+rpick :: RandomGen g 
+      => [a] 
+      -> Int 
+      -> g 
+      -> ([a], g)
+rpick _ 0 g = ([], g)
+rpick xs n g = let (ri, g') =   randomR range g
+                   (xs', g'') = rpick (lsdrop xs ri) (n-1) g'
+               in ((xs !! ri):xs', g'')
     where range = (0, (length xs)-1)
 
 -- | Apply a queue of functions to n random elements in a list.
@@ -71,15 +76,18 @@ rmap :: (RandomGen g)
      -> [a]             -- ^ List to partially, randomly map.
      -> Int             -- ^ Number of random elements to apply function to.
      -> g               -- ^ Random number generator.
-     -> [a]             -- ^ Partially, randomly mapped list.
-rmap _ [] _ _ = []
-rmap fs xs n g = rmap' fs (zip xs [0..])
+     -> ([a], g)        -- ^ Partially, randomly mapped list and random gen.
+rmap _ [] _ g = ([], g)
+rmap fs xs n g = let (hxs, g') = hotxs in (rmap' fs (zip xs [0..]) hxs, g')
     where hotxs = rpick [0..(length xs)-1] n g
-          rmap' :: [(a -> a)] -> [(a, Int)] -> [a]
-          rmap' _ [] = []
-          rmap' (f:fs) ((x, i):xs)
-              | elem i hotxs  = f x:rmap' fs xs
-              | otherwise     = x:rmap' (f:fs) xs
+          rmap' :: [(a -> a)] 
+                -> [(a, Int)] 
+                -> [Int] 
+                -> [a]
+          rmap' _ [] _ = []
+          rmap' (f:fs) ((x, i):xs) hxs
+              | elem i hxs    = f x:rmap' fs xs hxs
+              | otherwise     = x:rmap' (f:fs) xs hxs
 
 -- | Convert a list of values to a list of functions that return the value. 
 functionize :: [a] -> [(a -> a)]
@@ -150,6 +158,7 @@ solve p = evaluateGeneration p
 -- TODO(jhibberd) Re-engineer all functions that accept RandomGen to also return
 -- the "incremented" RandomGen
 
+{-
 evolve :: RandomGen g
        => IO [(Genotype, Maybe Phenotype, Float)]
        -> g 
@@ -157,13 +166,23 @@ evolve :: RandomGen g
 evolve p g = fmap (map (mutate . genotype)) p
     where genotype (a, _, _) = a
           mutate gt = rmap (functionize $ rblockfeed g) gt 7 g
+-}
 
 evalPopulation :: Population -> IO [(Genotype, Maybe Phenotype, Float)]
 evalPopulation = fmap (sortByDeviation . map calcDeviation) . 
                  sequence . map evalFitness
 
-main = evalPopulation $ population
-    where makeGenotype g = rmap (functionize $ rblockfeed g) (newdef 10) 7 g
-          makeRandomGenotype (f, i) = f $ mkStdGen i
-          population = map makeRandomGenotype $ zip (repeat makeGenotype) [0..9]
+seedPopulation :: RandomGen g 
+               => Int 
+               -> g 
+               -> (Population, g)
+seedPopulation 0 g = ([], g)
+seedPopulation n g = let (p, g') =   grow g
+                         (ps, g'') = seedPopulation (n-1) g'
+                     in (p:ps, g'')
+    where grow g''' = rmap (functionize $ rblockfeed g''') (newdef 10) 7 g'''
+
+main = let (p, g') = seedPopulation 10 g 
+       in evalPopulation p
+    where g = mkStdGen 5
 
