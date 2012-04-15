@@ -69,25 +69,36 @@ rpick xs n g = let (ri, g') =   randomR range g
     where range = (0, (length xs)-1)
 
 -- | Apply a queue of functions to n random elements in a list.
+--
+-- rmap' has essentially the same signature as rmap except that the second arg
+-- is a list of elements with their corresponding ordinal positions instead of
+-- just a list of elements ([(a, Int)] instead of [a]).
 rmap :: (RandomGen g) 
-     => [(a -> a)]      -- ^ List of map functions to apply to random elements. 
-                        --   The list of treated as a queue, popping a function, 
-                        --   applying it, then discarding it.
-     -> [a]             -- ^ List to partially, randomly map.
-     -> Int             -- ^ Number of random elements to apply function to.
-     -> g               -- ^ Random number generator.
-     -> ([a], g)        -- ^ Partially, randomly mapped list and random gen.
+     => (a -> g -> (a, g))  -- ^ Function to apply to randomly selected element.
+     -> [a]                 -- ^ List to partially, randomly map.
+     -> Int                 -- ^ Number of random elements to apply function to.
+     -> g                   -- ^ Random number generator.
+     -> ([a], g)            -- ^ Partially, randomly mapped list and random gen.
 rmap _ [] _ g = ([], g)
-rmap fs xs n g = let (hxs, g') = hotxs in (rmap' fs (zip xs [0..]) hxs, g')
-    where hotxs = rpick [0..(length xs)-1] n g
-          rmap' :: [(a -> a)] 
+rmap f xs n g = let (hotxs, g') = rpick [0..(length xs)-1] n g 
+                in rmap' f (zip xs [0..]) hotxs g'
+    where rmap' :: RandomGen g
+                => (a -> g -> (a, g)) 
                 -> [(a, Int)] 
-                -> [Int] 
-                -> [a]
-          rmap' _ [] _ = []
-          rmap' (f:fs) ((x, i):xs) hxs
-              | elem i hxs    = f x:rmap' fs xs hxs
-              | otherwise     = x:rmap' (f:fs) xs hxs
+                -> [Int]
+                -> g 
+                -> ([a], g)
+          rmap' _ [] _ g = ([], g)
+          rmap' f ((x, i):xs) hxs g
+              | elem i hxs    = let (x', g') =    f x g
+                                    (xs', g'') =  rmap' f xs hxs g'
+                                in  (x':xs', g'')
+              | otherwise     = let (xs', g') =   rmap' f xs hxs g
+                                in  (x:xs', g')
+
+main = return $ rmap f [1..10] 5 (mkStdGen 1)
+    where f :: RandomGen g => Int -> g -> (Int, g)
+          f x g = randomR (1, 1000) g
 
 -- | Convert a list of values to a list of functions that return the value. 
 functionize :: [a] -> [(a -> a)]
@@ -171,7 +182,7 @@ evolve p g = fmap (map (mutate . genotype)) p
 evalPopulation :: Population -> IO [(Genotype, Maybe Phenotype, Float)]
 evalPopulation = fmap (sortByDeviation . map calcDeviation) . 
                  sequence . map evalFitness
-
+{-
 seedPopulation :: RandomGen g 
                => Int 
                -> g 
@@ -181,8 +192,10 @@ seedPopulation n g = let (p, g') =   grow g
                          (ps, g'') = seedPopulation (n-1) g'
                      in (p:ps, g'')
     where grow g''' = rmap (functionize $ rblockfeed g''') (newdef 10) 7 g'''
-
+-}
+{-
 main = let (p, g') = seedPopulation 10 g 
        in evalPopulation p
     where g = mkStdGen 5
+-}
 
