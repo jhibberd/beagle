@@ -47,9 +47,10 @@ instance Random Block where
             (x, g') -> (toEnum x, g')
     random g = randomR (minBound, maxBound) g
 
--- | Return an infinite list of random blocks.
-rblockfeed :: (RandomGen g) => g -> [Block]
-rblockfeed g = randomRs (minBound, maxBound) g
+-- | Return a random gene.
+rgene :: RandomGen g => g -> (Block, g)
+rgene g = let (x, g') = randomR (minBound, maxBound) g
+          in (x, g')
 
 -- | Remove element at a specific index position from a list.
 lsdrop :: [a] -> Int -> [a]
@@ -95,16 +96,6 @@ rmap f xs n g = let (hotxs, g') = rpick [0..(length xs)-1] n g
                                 in  (x':xs', g'')
               | otherwise     = let (xs', g') =   rmap' f xs hxs g
                                 in  (x:xs', g')
-
-main = return $ rmap f [1..10] 5 (mkStdGen 1)
-    where f :: RandomGen g => Int -> g -> (Int, g)
-          f x g = randomR (1, 1000) g
-
--- | Convert a list of values to a list of functions that return the value. 
-functionize :: [a] -> [(a -> a)]
-functionize xs = map (\x -> (\_ -> x)) xs
-
--- DOMAIN LANGUAGE -------------------------------------------------------------
 
 -- | Map block tokens to their string counterparts in the domain language.
 blockstr = [
@@ -155,34 +146,23 @@ calcDeviation (eg, p) = (eg, p, dev p)
 sortByDeviation :: (Ord c) => [(a, b, c)] -> [(a, b, c)]
 sortByDeviation = sortBy (\(_, _, a) (_, _, b) -> compare a b)
 
--- MAIN ------------------------------------------------------------------------
-
--- take 1 from this
-{-
-solve :: Generation -> Genotype
-solve g = evaluateGeneration . pickMostPromisingCandidates . 
-          extractAnyPerfectCandidates . usePromisingCandidateToBuildNewGen
-          returnPerfectCandidate ++ solve newGen
-solve p = evaluateGeneration p
--}
-
--- TODO(jhibberd) Re-engineer all functions that accept RandomGen to also return
--- the "incremented" RandomGen
-
-{-
 evolve :: RandomGen g
-       => IO [(Genotype, Maybe Phenotype, Float)]
-       -> g 
-       -> IO Population
-evolve p g = fmap (map (mutate . genotype)) p
+       => g
+       -> [(Genotype, Maybe Phenotype, Float)]
+       -> (Population, g)
+evolve g [] = ([], g)
+evolve g (p:ps) = let (p', g') = mutate (genotype p) g
+                      (ps', g'') = evolve g' ps
+                  in (p':ps', g'')
     where genotype (a, _, _) = a
-          mutate gt = rmap (functionize $ rblockfeed g) gt 7 g
--}
+          mutate gt g = rmap (\_ g -> rgene g) gt 7 g
 
 evalPopulation :: Population -> IO [(Genotype, Maybe Phenotype, Float)]
 evalPopulation = fmap (sortByDeviation . map calcDeviation) . 
                  sequence . map evalFitness
-{-
+
+genotypeLength = 8
+
 seedPopulation :: RandomGen g 
                => Int 
                -> g 
@@ -191,11 +171,30 @@ seedPopulation 0 g = ([], g)
 seedPopulation n g = let (p, g') =   grow g
                          (ps, g'') = seedPopulation (n-1) g'
                      in (p:ps, g'')
-    where grow g''' = rmap (functionize $ rblockfeed g''') (newdef 10) 7 g'''
--}
-{-
-main = let (p, g') = seedPopulation 10 g 
-       in evalPopulation p
+    where grow g''' = rmap (\_ g -> rgene g) (newdef genotypeLength) 7 g'''
+
+solutions :: [(Genotype, Maybe Phenotype, Float)] -> [Genotype]
+solutions = map genotype . filter (\(_, _, d) -> d == 0)
+
+genotype :: (Genotype, Maybe Phenotype, Float) -> Genotype
+genotype (x, _, _) = x
+
+solve :: RandomGen g 
+      => IO Population 
+      -> g
+      -> IO [Genotype]
+solve p g = do
+    p <- p
+    ep <- evalPopulation p
+    let (nxp, g') = evolve g ep
+        s = solutions ep
+    if length s > 0 then return s
+    else solve (return nxp) g'
+
+main = do
+    let (p, g') = seedPopulation 10 g
+    ss <- solve (return p) g'
+    return (head ss)
     where g = mkStdGen 5
--}
+
 
