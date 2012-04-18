@@ -6,9 +6,11 @@ import Data.List (sortBy)
 import Data.Maybe (fromJust)
 import System.Random
 
-genotypeLength = 8
-targetPhenotype = 5
-mutationsPerGenotype = 7
+genotypeLength =        8
+targetPhenotype =       5
+mutationsPerGenotype =  7
+populationSize =        10
+randomSeed =            5
 
 instance Bounded Gene where
     minBound = toEnum 0
@@ -77,19 +79,16 @@ rmap f xs n g = let (hotxs, g') = rpick [0..(length xs)-1] n g
               | otherwise     = let (xs', g') =   rmap' f xs hxs g
                                 in  (x:xs', g')
 
--- | Calculate the deviation between the target phenotype and observed 
+-- | Calculate the delta (deviation) between the target phenotype and observed 
 -- phenotype. The deviation is a float between zero and infinity: zero meaning
 -- the candidate phenotype matched the target phenotype; infinity meaning that
 -- the candidate couldn't be evaluated and therefore had no observable 
 -- phenotype.
-calcDeviation :: (Genotype, Maybe Phenotype)
-              -> (Genotype, Maybe Phenotype, Float)
-calcDeviation (eg, p) = (eg, p, dev p)
-    where dev (Just observedPT) = abs (read observedPT - targetPhenotype)
-          dev Nothing = 1/0 -- Infinity
-
-sortByDeviation :: (Ord c) => [(a, b, c)] -> [(a, b, c)]
-sortByDeviation = sortBy (\(_, _, a) (_, _, b) -> compare a b)
+getDelta :: (Genotype, Maybe Phenotype)
+         -> (Genotype, Maybe Phenotype, Float)
+getDelta (gt, pt) = (gt, pt, d pt)
+    where d (Just pt') = abs (read pt' - targetPhenotype)
+          d Nothing    = 1/0 -- Infinity
 
 evolve :: RandomGen g
        => g
@@ -101,9 +100,11 @@ evolve g (p:ps) = let (p', g') = mutate (genotype p) g
                   in (p':ps', g'')
     where mutate gt g = rmap (\_ g -> rgene g) gt mutationsPerGenotype g
 
-evalPopulation :: Population -> IO [(Genotype, Maybe Phenotype, Float)]
-evalPopulation = fmap (sortByDeviation . map calcDeviation) . 
-                 sequence . map eval
+evalPopulation :: Population -> [(Genotype, Maybe Phenotype, Float)]
+evalPopulation = sortByDeviation . map (getDelta . eval)
+
+sortByDeviation :: (Ord c) => [(a, b, c)] -> [(a, b, c)]
+sortByDeviation = sortBy (\(_, _, a) (_, _, b) -> compare a b)
 
 seedPopulation :: RandomGen g 
                => Int 
@@ -117,25 +118,22 @@ seedPopulation n g = let (p, g') =   mkgenotype g
 solutions :: [(Genotype, Maybe Phenotype, Float)] -> [Genotype]
 solutions = map genotype . filter (\(_, _, d) -> d == 0)
 
+-- TODO(jhibberd) Use record syntax instead.
 genotype :: (Genotype, Maybe Phenotype, Float) -> Genotype
 genotype (x, _, _) = x
 
 solve :: RandomGen g 
-      => IO Population 
+      => Population 
       -> g
-      -> IO [Genotype]
-solve p g = do
-    p <- p
-    ep <- evalPopulation p
-    let (nxp, g') = evolve g ep
-        s = solutions ep
-    if length s > 0 then return s
-    else solve (return nxp) g'
+      -> [Genotype]
+solve [] _ = []
+solve p g = let ep = evalPopulation p
+                (nxp, g') = evolve g ep
+            in solutions ep ++ solve nxp g'
 
-main = do
-    let (p, g') = seedPopulation 10 g
-    ss <- solve (return p) g'
-    return (head ss)
-    where g = mkStdGen 5
+-- TODO(jhibberd) Use inside seedPopulation
+main = let (p, g') = seedPopulation populationSize g
+       in return . head $ solve p g'
+    where g = mkStdGen randomSeed
 
 

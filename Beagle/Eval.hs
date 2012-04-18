@@ -1,13 +1,18 @@
 -- | Evaluate the fitness of a candidate solution using the domain evaluation
 -- server.
 
+-- | Explain about usage of unsafePerformIO
+
 module Beagle.Eval
-    ( eval 
+    ( eval
     ) where
 
 import Beagle.Type
 import qualified Data.Map as Map
 import Network.HTTP
+import System.IO.Unsafe (unsafePerformIO)
+
+httpEndpoint = "http://localhost:1831/"
 
 -- | Map block tokens to their string counterparts in the domain language.
 blockstr = [
@@ -31,14 +36,15 @@ blockstrMap = Map.fromList blockstr
 
 -- | Map all non-Empty blocks of a definition to their domain language 
 -- counterpart
-encodeGenotype :: Genotype -> String
-encodeGenotype = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
+encode :: Genotype -> String
+encode = map (\x -> blockstrMap Map.! x) . filter (/=Empty)
 
 -- | Evaluate definition using the domain server.
-eval :: Genotype -> IO (Genotype, Maybe Phenotype)
-eval domdef = fmap (\x -> (domdef, x)) $ fmap parse result
-    where host = "http://localhost:1831/"
-          result = simpleHTTP (getRequest (host++encodedGT)) >>= getResponseBody
+eval :: Genotype -> (Genotype, Maybe Phenotype)
+eval genotype = let phenotype = parse get in (genotype, phenotype)
+    where get = unsafePerformIO (simpleHTTP (getRequest url) 
+                                 >>= getResponseBody)
           parse ('0':xs) = Just xs
           parse ('1':xs) = Nothing
-          encodedGT = encodeGenotype domdef
+          url = httpEndpoint ++ encode genotype
+
