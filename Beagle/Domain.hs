@@ -4,8 +4,6 @@ module Beagle.Domain
     , stop
     ) where
 
-import Debug.Trace
-
 import Data.Dynamic
 import qualified Data.Map as Map
 
@@ -48,8 +46,8 @@ genemap = Map.fromList [
  
 digit :: Int -> Maybe Int -> Maybe Int
 digit x Nothing = Just x
-digit x (Just y) = Just (read (trace (show xx) xx))
-    where xx = show (max x 0) ++ show (max y 0)
+digit x (Just y) = Just (read v)
+    where v = show (max x 0) ++ show (max y 0)
 
 digit0 = digit 0
 digit1 = digit 1
@@ -65,12 +63,15 @@ digit9 = digit 9
 add' :: Maybe Int -> Maybe Int -> Maybe Int
 add' (Just x) (Just y) = Just (x + y)
 add' _ _ = Nothing
+
 subtract' :: Maybe Int -> Maybe Int -> Maybe Int
 subtract' (Just x) (Just y) = Just (x - y)
 subtract' _ _ = Nothing
+
 multiply' :: Maybe Int -> Maybe Int -> Maybe Int
 multiply' (Just x) (Just y) = Just (x * y)
 multiply' _ _ = Nothing
+
 divide' :: Maybe Int -> Maybe Int -> Maybe Int
 divide' (Just _) (Just 0) = Just 0
 divide' (Just x) (Just y) = Just (quot x y)
