@@ -1,13 +1,16 @@
 -- | Genetic Algorithm
 
-import Beagle.Type
+import Debug.Trace
+
+import Beagle.Domain
 import Beagle.Eval
+import Beagle.Type
 import Data.List (sortBy)
 import Data.Maybe (fromJust)
 import System.Random
 
 genotypeLength =        8
-targetPhenotype =       5
+targetPhenotype =       100
 mutationsPerGenotype =  7
 populationSize =        10
 randomSeed =            5
@@ -87,7 +90,7 @@ rmap f xs n g = let (hotxs, g') = rpick [0..(length xs)-1] n g
 getDelta :: (Genotype, Maybe Phenotype)
          -> (Genotype, Maybe Phenotype, Float)
 getDelta (gt, pt) = (gt, pt, d pt)
-    where d (Just pt') = abs (read pt' - targetPhenotype)
+    where d (Just pt') = abs ((read (trace pt' pt')) - targetPhenotype)
           d Nothing    = 1/0 -- Infinity
 
 evolve :: RandomGen g
@@ -101,7 +104,7 @@ evolve g (p:ps) = let (p', g') = mutate (genotype p) g
     where mutate gt g = rmap (\_ g -> rgene g) gt mutationsPerGenotype g
 
 evalPopulation :: Population -> [(Genotype, Maybe Phenotype, Float)]
-evalPopulation = sortByDeviation . map (getDelta . eval)
+evalPopulation = sortByDeviation . map (getDelta . eval2)
 
 sortByDeviation :: (Ord c) => [(a, b, c)] -> [(a, b, c)]
 sortByDeviation = sortBy (\(_, _, a) (_, _, b) -> compare a b)

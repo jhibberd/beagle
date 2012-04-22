@@ -1,10 +1,12 @@
 module Beagle.Type
-    ( Gene (..)
-    , Genotype
+    ( Genotype
     , Phenotype
     , Population
     ) where
 
+import Beagle.Domain
+
+{-
 -- | Building blocks of a genotype.
 data Gene = Digit0
           | Digit1
@@ -22,6 +24,7 @@ data Gene = Digit0
           | OpDiv
           | Empty
           deriving (Ord, Eq, Show, Enum)
+-}
 
 -- | Definition of a candidate solution.
 type Genotype = [Gene]

@@ -4,14 +4,18 @@
 -- | Explain about usage of unsafePerformIO
 
 module Beagle.Eval
-    ( eval
+    ( eval2
     ) where
 
+import Debug.Trace
+
+import Beagle.Domain
 import Beagle.Type
+import Data.Dynamic
 import qualified Data.Map as Map
 import Network.HTTP
 import System.IO.Unsafe (unsafePerformIO)
-
+{-
 httpEndpoint = "http://localhost:1831/"
 
 -- | Map block tokens to their string counterparts in the domain language.
@@ -47,4 +51,39 @@ eval genotype = let phenotype = parse get in (genotype, phenotype)
           parse ('0':xs) = Just xs
           parse ('1':xs) = Nothing
           url = httpEndpoint ++ encode genotype
+-}
+
+-- | Evaluation using only haskell ---------------------------------------------
+
+-- | Evaluate a sequence of progam blocks.
+eval' :: [Dynamic]       -- ^ Unprocessed input stack.
+     -> Maybe [Dynamic] -- ^ Working stack; potentially partially folded
+     -> Maybe [Dynamic] -- ^ Final stack; should contain a single final value.
+eval' _ Nothing     = Nothing
+eval' [] (Just stk) = Just stk
+eval' (x:xs) (Just stk) 
+    | xtype == typeOf stop = eval' xs (foldl foldf (Just [x]) stk)
+    | otherwise            = eval' xs (Just (x:stk))
+    where xtype = dynTypeRep x
+          foldf (Just stk') x
+              | isfunc (head stk') = Just (stk' ++ [x])
+              | otherwise = case dynApply x (head stk') of
+                               Just x  -> Just [x]
+                               Nothing -> Nothing
+
+-- | Determine whether a dynamically-typed value is a function.
+isfunc :: Dynamic -> Bool
+isfunc x = typeRepTyCon (dynTypeRep x) == typeRepTyCon (typeOf2 id)
+
+-- | Convert list of genes to list of gene functions.
+initgene :: [Gene] -> [Dynamic]
+initgene = map (\x -> (Map.!) genemap x) . filter (/=Empty)
+
+eval2 :: Genotype -> (Genotype, Maybe Phenotype)
+eval2 gt = trace (show x) x
+    where x = (gt, display $ eval' (initgene gt) (Just []))
+
+display :: Maybe [Dynamic] -> Maybe String
+display (Just x) = fmap show $ (fromDyn (head x) Nothing :: Maybe Int)
+display Nothing = Nothing
 
