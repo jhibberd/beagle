@@ -1,9 +1,9 @@
 -- | Genetic Algorithm
 
-import Beagle.Type
+import Beagle.Domain
 import Beagle.Eval
+import Beagle.Type
 import Data.List (sortBy)
-import Data.Maybe (fromJust)
 import System.Random
 
 genotypeLength =        8

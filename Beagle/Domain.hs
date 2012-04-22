@@ -1,6 +1,7 @@
 module Beagle.Domain
     ( Gene(..)
     , genemap
+    , stop
     ) where
 
 import Data.Dynamic
@@ -18,7 +19,7 @@ data Gene = Digit0
           | Digit9
           | Add
           | Subtract
-          | Multiple
+          | Multiply
           | Divide
           | Stop
           | Empty
@@ -36,16 +37,17 @@ genemap = Map.fromList [
     (Digit7,    toDyn digit7),
     (Digit8,    toDyn digit8),
     (Digit9,    toDyn digit9),
-    (Add,       toDyn add),
-    (Subtract,  toDyn subtract),
-    (Multiply,  toDyn multiply),
-    (Divide,    toDyn divide),
-    (Stop,      toDyn stop),
+    (Add,       toDyn add'),
+    (Subtract,  toDyn subtract'),
+    (Multiply,  toDyn multiply'),
+    (Divide,    toDyn divide'),
+    (Stop,      toDyn stop)
     ]
  
 digit :: Int -> Maybe Int -> Maybe Int
 digit x Nothing = Just x
-digit x (Just y) = Just (read (show x ++ show y))
+digit x (Just y) = Just (read v)
+    where v = show (max x 0) ++ show (max y 0)
 
 digit0 = digit 0
 digit1 = digit 1
@@ -58,11 +60,22 @@ digit7 = digit 7
 digit8 = digit 8
 digit9 = digit 9
 
--- | Maybe Int -> Maybe Int -> Maybe Int
-add      (Just x) (Just y) = Just (x + y)
-subtract (Just x) (Just y) = Just (x - y)
-multiply (Just x) (Just y) = Just (x * y)
-divide   (Just x) (Just y) = Just (x / y)
+add' :: Maybe Int -> Maybe Int -> Maybe Int
+add' (Just x) (Just y) = Just (x + y)
+add' _ _ = Nothing
+
+subtract' :: Maybe Int -> Maybe Int -> Maybe Int
+subtract' (Just x) (Just y) = Just (x - y)
+subtract' _ _ = Nothing
+
+multiply' :: Maybe Int -> Maybe Int -> Maybe Int
+multiply' (Just x) (Just y) = Just (x * y)
+multiply' _ _ = Nothing
+
+divide' :: Maybe Int -> Maybe Int -> Maybe Int
+divide' (Just _) (Just 0) = Just 0
+divide' (Just x) (Just y) = Just (quot x y)
+divide' _ _ = Nothing
 
 stop = Nothing :: Maybe Int
 
