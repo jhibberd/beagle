@@ -52,10 +52,10 @@ geneMap = Map.fromList [
 -- | Evaluation ----------------------------------------------------------------
 
 -- | Evaluate a sequence of progam blocks.
-eval :: [Dynamic] -- ^ Unprocessed input stack.
+eval :: [Dynamic]       -- ^ Unprocessed input stack.
      -> Maybe [Dynamic] -- ^ Working stack; potentially partially folded
-     -> Maybe [Dynamic] -- ^ Final stack; should contain a single resultant value.
-eval _ Nothing = Nothing
+     -> Maybe [Dynamic] -- ^ Final stack; should contain a single final value.
+eval _ Nothing     = Nothing
 eval [] (Just stk) = Just stk
 eval (x:xs) (Just stk) 
     | xtype == typeOf stop = eval xs (foldl foldf (Just [x]) stk)
@@ -64,10 +64,8 @@ eval (x:xs) (Just stk)
           foldf (Just stk') x
               | isfunc (head stk') = Just (stk' ++ [x])
               | otherwise = case dynApply x (head stk') of
-                               Just x -> Just [x]
+                               Just x  -> Just [x]
                                Nothing -> Nothing
-                --[fromJust $ dynApply x (head stk')]
-                -- | return Nothing here if application fails
 
 -- | Determine whether a dynamically-typed value is a function.
 isfunc :: Dynamic -> Bool
