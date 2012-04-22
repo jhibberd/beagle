@@ -52,17 +52,20 @@ geneMap = Map.fromList [
 -- | Evaluation ----------------------------------------------------------------
 
 -- | Evaluate a sequence of progam blocks.
-eval :: [Dynamic] -- ^ Unprocessed input stack.
-     -> [Dynamic] -- ^ Working stack; potentially partially folded
-     -> [Dynamic] -- ^ Final stack; should contain a single resultant value.
-eval [] stk = stk
-eval (x:xs) stk 
-    | xtype == typeOf stop = eval xs (foldl foldf [x] stk)
-    | otherwise            = eval xs (x:stk)
+eval :: [Dynamic]       -- ^ Unprocessed input stack.
+     -> Maybe [Dynamic] -- ^ Working stack; potentially partially folded
+     -> Maybe [Dynamic] -- ^ Final stack; should contain a single final value.
+eval _ Nothing     = Nothing
+eval [] (Just stk) = Just stk
+eval (x:xs) (Just stk) 
+    | xtype == typeOf stop = eval xs (foldl foldf (Just [x]) stk)
+    | otherwise            = eval xs (Just (x:stk))
     where xtype = dynTypeRep x
-          foldf stk' x
-              | isfunc (head stk') = stk' ++ [x]
-              | otherwise = [fromJust $ dynApply x (head stk')]
+          foldf (Just stk') x
+              | isfunc (head stk') = Just (stk' ++ [x])
+              | otherwise = case dynApply x (head stk') of
+                               Just x  -> Just [x]
+                               Nothing -> Nothing
 
 -- | Determine whether a dynamically-typed value is a function.
 isfunc :: Dynamic -> Bool
@@ -80,6 +83,9 @@ sq :: [Gene]
 sq = [Max, Add, Digit1, Digit2, Stop, Digit2, Digit3, Stop, Digit3, Digit4,
       Stop, Digit1, Stop]
 
-main = return . toInt . head $ eval (initgene sq) []
-    where toInt x = fromDyn x Nothing :: Maybe Int
+main = return . display $ eval (initgene sq) (Just [])
+
+display :: Maybe [Dynamic] -> Maybe Int
+display (Just x) = fromDyn (head x) Nothing :: Maybe Int 
+display Nothing = Nothing
 
