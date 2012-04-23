@@ -36,11 +36,12 @@ initgene :: [Gene] -> [Dynamic]
 initgene = map (\x -> (Map.!) genemap x) . filter (/=Empty)
 
 eval :: Genotype -> (Genotype, Maybe Phenotype)
-eval gt = trace (show x) x
+eval gt = {-trace (show x)-} x
     where x = (gt, display $ eval' (initgene gt) stk)
           stk = Just []
 
 display :: Maybe [Dynamic] -> Maybe String
+display (Just []) = Nothing
 display (Just x) = fmap show $ (fromDyn (head x) Nothing :: Maybe Int)
 display Nothing = Nothing
 
