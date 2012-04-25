@@ -1,5 +1,4 @@
--- | Evaluate the fitness of a candidate solution using the domain evaluation
--- server.
+-- | Evaluate a genotype to produce the observed phenotype.
 
 module Beagle.Eval
     ( eval

@@ -2,10 +2,21 @@ module Beagle.Domain
     ( Gene(..)
     , genemap
     , stop
+    , genotypeLength
+    , targetPhenotype
+    , mutationsPerGenotype
+    , populationSize
+    , randomSeed
     ) where
 
 import Data.Dynamic
 import qualified Data.Map as Map
+
+genotypeLength =        7   :: Int
+targetPhenotype =       55  :: Float
+mutationsPerGenotype =  2   :: Int
+populationSize =        10  :: Int
+randomSeed =            5   :: Int
 
 data Gene = Digit0
           | Digit1
