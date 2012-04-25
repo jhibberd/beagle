@@ -53,7 +53,7 @@ solve :: RandomGen g
       -> [(Genotype, Int)]
 solve [] _ _ = []
 solve p g i = let ep = evalPopulation p
-                  (nxp, g') = evolve g (doubleTopHalf (take D.populationSize ep))
+                  (nxp, g') = evolve g ep
             in solutions i ep ++ solve nxp g' (i+D.populationSize)
 
 main = let (p, g') = popSeed R.g

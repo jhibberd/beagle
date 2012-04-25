@@ -15,11 +15,12 @@ evolve :: RandomGen g
        => g
        -> [(Genotype, Maybe Phenotype, Delta)]
        -> (Population, g)
-evolve g [] = ([], g)
-evolve g (p:ps) = let (p', g') = mutate (genotype p) g
-                      (ps', g'') = evolve g' ps
-                  in (p':ps', g'')
-    where mutate gt g = R.map (\_ g -> R.gene g) gt D.mutationsPerGenotype g
+evolve g ps = f g (doubleTopHalf ps)
+    where f g [] = ([], g)
+          f g (p:ps) = let (p', g') = mutate (genotype p) g
+                           (ps', g'') = evolve g' ps
+                       in (p':ps', g'')
+          mutate gt g = R.map (\_ g -> R.gene g) gt D.mutationsPerGenotype g
 
 -- | Basic implementation of evolution: take the half of the population whose
 -- phenotype was closest to the target phenotype. Double each candidate to 
