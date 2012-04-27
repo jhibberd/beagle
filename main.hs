@@ -5,6 +5,7 @@ import Beagle.Eval
 import Beagle.Evolve
 import qualified Beagle.Random as R
 import Beagle.Type
+import Control.Monad.State
 import Data.List (sortBy)
 import System.Random
 
@@ -27,8 +28,10 @@ getDelta (gt, pt) = (gt, pt, d pt)
     where d (Just pt') = abs (read pt' - D.targetPhenotype)
           d Nothing    = 1/0 -- Infinity
 
-evalPopulation :: Population -> [(Genotype, Maybe Phenotype, Delta)]
-evalPopulation = sort . map (getDelta . eval)
+evalPopulation :: Population -> State Int [(Genotype, Maybe Phenotype, Delta)]
+evalPopulation p = do
+        modify (+ length p)
+        return ((sort . map (getDelta . eval)) $ p)
     where sort = sortBy (\a b -> compare (delta a) (delta b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
@@ -40,22 +43,26 @@ popSeed = f D.populationSize
                       (ps, g'') = f (n-1) g'
                   in (p:ps, g'')
 
-solutions :: a -- ^ tag (eg stats object)
-          -> [(Genotype, Maybe Phenotype, Delta)]
-          -> [(Genotype, a)]
-solutions a = map (addtag . genotype) . filter (\(_, _, d) -> d == 0)
-    where addtag x = (x, a)
+-- | Filter an evaluated population to return only candidates whose phenotype
+-- matches the target phenotype.
+solutions :: [(Genotype, Maybe Phenotype, Delta)] -> [Genotype]
+solutions = map (genotype) . filter (\gt -> delta gt == 0)
 
+-- | Find n genotypes that exhibit target phenotypes, given a seed population
+-- (p) and random generator (g).
 solve :: RandomGen g 
       => Population 
       -> g
       -> Int
-      -> [(Genotype, Int)]
-solve [] _ _ = []
-solve p g i = let ep = evalPopulation p
-                  (nxp, g') = evolve g ep
-            in solutions i ep ++ solve nxp g' (i+D.populationSize)
+      -> State Int [Genotype]
+solve _ _ 0 = return []
+solve p g n = do
+    ep <- evalPopulation p
+    let (nxp, g') = evolve g ep
+        s = solutions ep
+    s' <- solve nxp g' (n - length s)
+    return (s ++ s')
 
 main = let (p, g') = popSeed R.g
-       in print . take 1 $ solve p g' 0
+       in print $ runState (solve p g' 1) 0
 
