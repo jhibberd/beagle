@@ -61,35 +61,25 @@ solve :: RandomGen g
       => Population 
       -> g
       -> Int
+      -> Bool -- Use intelligent evolution function (or random).
       -> State Counters [Genotype]
-{-
-solve _ _ 0 = return []
-solve p g n = do
+solve _ _ 0 _ = return []
+solve p g n intel = do
     ep <- evalPopulation p
-    let (nxp, g') = evolve g ep
+    let evolveF = case intel of
+            True -> evolve
+            False -> evolveR
+    let (nxp, g') = evolveF g ep
     s <- solutions ep
-    s' <- solve nxp g' (n - length s)
+    s' <- solve nxp g' (n - length s) intel
     return (s ++ s')
 
-main = let (p, g') = popSeed R.g
-           (sp, s) = runState (solve p g' D.numSolutions) newCounters
-       in print $ (sp, stats s)
--}
-
-solve _ _ 0 = return []
-solve p g n = do
-    ep <- evalPopulation p
-    let x = printPop2 "a - " ep
-        (nxp, g') = evolve g ep
-        y = map (length . show) x
-        y' = sum y
-    put [y', 0]
-    return nxp
-    where printPop2 t = map (\x -> trace (t ++ show x) x)
-
-main = let (p, g') = popSeed R.g
-           (sp, s) = runState (solve p g' D.numSolutions) newCounters
-           x' = printPop "b - " sp
-       in print $ (sp, s, x', "fefe")
-    where printPop t = map (\x -> trace (t ++ show x) x)
+main = do 
+    let (p, g') = popSeed R.g
+    print "Intelligent evolution:"
+    let (sp, s) = runState (solve p g' D.numSolutions True) newCounters 
+    print $ (sp, stats s)
+    print "Random evolution:"
+    let (sp, s) = runState (solve p g' D.numSolutions False) newCounters 
+    print $ (sp, stats s)
 
