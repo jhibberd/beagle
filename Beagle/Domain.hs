@@ -13,12 +13,12 @@ module Beagle.Domain
 import Data.Dynamic
 import qualified Data.Map as Map
 
-genotypeLength =        7   :: Int
+genotypeLength =        6   :: Int
 targetPhenotype =       55  :: Float
 mutationsPerGenotype =  2   :: Int
 populationSize =        10  :: Int
 randomSeed =            5   :: Int
-numSolutions =          2   :: Int
+numSolutions =          5   :: Int
 
 data Gene = Digit0
           | Digit1

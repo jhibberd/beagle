@@ -69,5 +69,6 @@ solve p g n = do
     return (s ++ s')
 
 main = let (p, g') = popSeed R.g
-       in print $ runState (solve p g' D.numSolutions) newCounters
+           (sp, s) = runState (solve p g' D.numSolutions) newCounters
+       in print $ (sp, stats s)
 
