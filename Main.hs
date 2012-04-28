@@ -4,6 +4,7 @@ import qualified Beagle.Domain as D
 import Beagle.Eval
 import Beagle.Evolve
 import qualified Beagle.Random as R
+import Beagle.Stat
 import Beagle.Type
 import Control.Monad.State
 import Data.List (sortBy)
@@ -28,10 +29,11 @@ getDelta (gt, pt) = (gt, pt, d pt)
     where d (Just pt') = abs (read pt' - D.targetPhenotype)
           d Nothing    = 1/0 -- Infinity
 
-evalPopulation :: Population -> State Int [(Genotype, Maybe Phenotype, Delta)]
+evalPopulation :: Population 
+               -> State Counters [(Genotype, Maybe Phenotype, Delta)]
 evalPopulation p = do
-        modify (+ length p)
-        return ((sort . map (getDelta . eval)) $ p)
+        modify . incrGenotypes . length $ p
+        return . sort . map (getDelta . eval) $ p
     where sort = sortBy (\a b -> compare (delta a) (delta b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
@@ -45,8 +47,11 @@ popSeed = f D.populationSize
 
 -- | Filter an evaluated population to return only candidates whose phenotype
 -- matches the target phenotype.
-solutions :: [(Genotype, Maybe Phenotype, Delta)] -> [Genotype]
-solutions = map (genotype) . filter (\gt -> delta gt == 0)
+solutions :: [(Genotype, Maybe Phenotype, Delta)] -> State Counters [Genotype]
+solutions p = do
+    let s = map (genotype) . filter (\gt -> delta gt == 0) $ p
+    modify . incrSolutions $ length s
+    return s
 
 -- | Find n genotypes that exhibit target phenotypes, given a seed population
 -- (p) and random generator (g).
@@ -54,15 +59,15 @@ solve :: RandomGen g
       => Population 
       -> g
       -> Int
-      -> State Int [Genotype]
+      -> State Counters [Genotype]
 solve _ _ 0 = return []
 solve p g n = do
     ep <- evalPopulation p
     let (nxp, g') = evolve g ep
-        s = solutions ep
+    s <- solutions ep
     s' <- solve nxp g' (n - length s)
     return (s ++ s')
 
 main = let (p, g') = popSeed R.g
-       in print $ runState (solve p g' 1) 0
+       in print $ runState (solve p g' D.numSolutions) newCounters
 

@@ -7,6 +7,7 @@ module Beagle.Domain
     , mutationsPerGenotype
     , populationSize
     , randomSeed
+    , numSolutions
     ) where
 
 import Data.Dynamic
@@ -17,6 +18,7 @@ targetPhenotype =       55  :: Float
 mutationsPerGenotype =  2   :: Int
 populationSize =        10  :: Int
 randomSeed =            5   :: Int
+numSolutions =          2   :: Int
 
 data Gene = Digit0
           | Digit1
