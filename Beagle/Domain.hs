@@ -17,8 +17,8 @@ genotypeLength =        6   :: Int
 targetPhenotype =       55  :: Float
 mutationsPerGenotype =  2   :: Int
 populationSize =        10  :: Int
-randomSeed =            5   :: Int
-numSolutions =          5   :: Int
+randomSeed =            6   :: Int
+numSolutions =          1   :: Int
 
 data Gene = Digit0
           | Digit1

@@ -4,6 +4,7 @@
 module Beagle.Random
     ( gene
     , map
+    , pick
     , g
     ) where
 

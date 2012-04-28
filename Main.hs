@@ -1,5 +1,7 @@
 -- | Genetic Algorithm
 
+import Debug.Trace
+
 import qualified Beagle.Domain as D
 import Beagle.Eval
 import Beagle.Evolve
@@ -60,6 +62,7 @@ solve :: RandomGen g
       -> g
       -> Int
       -> State Counters [Genotype]
+{-
 solve _ _ 0 = return []
 solve p g n = do
     ep <- evalPopulation p
@@ -71,4 +74,22 @@ solve p g n = do
 main = let (p, g') = popSeed R.g
            (sp, s) = runState (solve p g' D.numSolutions) newCounters
        in print $ (sp, stats s)
+-}
+
+solve _ _ 0 = return []
+solve p g n = do
+    ep <- evalPopulation p
+    let x = printPop2 "a - " ep
+        (nxp, g') = evolve g ep
+        y = map (length . show) x
+        y' = sum y
+    put [y', 0]
+    return nxp
+    where printPop2 t = map (\x -> trace (t ++ show x) x)
+
+main = let (p, g') = popSeed R.g
+           (sp, s) = runState (solve p g' D.numSolutions) newCounters
+           x' = printPop "b - " sp
+       in print $ (sp, s, x', "fefe")
+    where printPop t = map (\x -> trace (t ++ show x) x)
 
