@@ -1,19 +1,16 @@
 module Beagle.Domain
     ( Gene(..)
-    , gmap
     , genotypeLength
     , mutationsPerGenotype
     , populationSize
     , randomSeed
     , score
-    , initState
-    , State
     ) where
 
+import Beagle.Eval2
 import qualified Data.Map as Map
-import Debug.Trace
-import System.IO.Unsafe
-import System.Random
+
+-- | Data types and constants --------------------------------------------------
 
 genotypeLength =        15      :: Int
 mutationsPerGenotype =  1       :: Int
@@ -22,6 +19,7 @@ randomSeed =            6       :: Int
 
 data Gene = RotateR | RotateL | SwapR | SwapL | MoveR | MoveL | Empty
     deriving (Ord, Eq, Show, Enum)
+type State = (Int, [Int])
 
 gmap :: Map.Map Gene ([Gene] -> Int -> State -> ([Gene], Int, State))
 gmap = Map.fromList [
@@ -34,7 +32,7 @@ gmap = Map.fromList [
     (Empty,         empty)
     ]
 
-type State = (Int, [Int])
+-- | Gene implementations ------------------------------------------------------
 
 rotateR, rotateL, swapR, swapL, moveR, moveL, empty :: 
     [Gene] -> Int -> State -> ([Gene], Int, State)
@@ -59,11 +57,11 @@ moveL gs gi (i, xs)
     | otherwise = (gs, gi+1, (i-1, xs))
 empty gs gi s = (gs, gi+1, s)
 
-score :: State -> Float
-score (_, xs) = score' $ traceShow xs xs
+-- | Scoring function ----------------------------------------------------------
+
+score :: [Gene] -> Float
+score gs = score' . snd $ eval gs gmap 0 initState
     where score' = (/10) . fromIntegral . length . filter (\(a, b) -> a /= b) . 
             zip [1..]
-
-initState :: (Int, [Int])
-initState = (0, [1, 3, 5, 2, 6, 4])
+          initState = (0, [1, 3, 5, 2, 6, 4])
 

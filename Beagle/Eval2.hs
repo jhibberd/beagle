@@ -2,15 +2,23 @@ module Beagle.Eval2
     ( eval
     ) where
 
-import Beagle.Domain as D
-import Beagle.Type
 import qualified Data.Map as Map
 import Debug.Trace
 
-eval :: Genotype -> Int -> State -> (Genotype, Float)
-eval g i s 
-    | i == length g = traceShow final final
-    | otherwise = let (g', i', s') = f g i s
-                  in eval g' i' s'
-        where f = (Map.!) D.gmap (g !! i)
-              final = (g, D.score s)
+-- | Runs an initial state through a gene sequence and returns the final state.
+--
+-- The state (s) and gene (g) data types are defined in the domain module.
+eval :: (Ord g, Show s, Show g)
+     => [g] -- Gene sequence 
+     -- Maps a gene to its function implementation
+     -> Map.Map g ([g] -> Int -> s -> ([g], Int, s))
+     -- Index (within the gene sequence) of the current gene being applied to
+     -- the state.
+     -> Int 
+     -> s -- Initial (or current, during recursive calls) state
+     -> s -- Final state 
+eval gs gmap i s 
+    | i == length gs = {- trace (show gs ++ " -> " ++ show s) -} s
+    | otherwise = let (gs', i', s') = f gs i s
+                  in eval gs' gmap i' s'
+        where f = (Map.!) gmap (gs !! i)

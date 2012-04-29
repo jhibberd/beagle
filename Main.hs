@@ -18,17 +18,11 @@ mkgenotype = f D.genotypeLength
                       (xs, g'') = f (n-1) g'
                   in (x:xs, g'')
 
-{-
-evalPopulation :: Population 
-               -> State Counters [(Genotype, Score)]
-evalPopulation p = do
-        modify . incrGenotypes . length $ p
-        return . sort . map eval $ p
-    where sort = sortBy (\a b -> compare (snd a) (snd b))
--}
-evalPopulation :: Population 
-               -> [(Genotype, Score)]
-evalPopulation p = sort . map (\x -> eval x 0 D.initState) $ p
+-- | Using the domain's fitness function (D.score), calculate the score (a value
+-- between 0 and 1) of each genotype in the population. The resultant list of
+-- genotype/score pairs is sorted by score.
+popScore :: [Genotype] -> [(Genotype, Score)]
+popScore = sort . map (\x -> (x, D.score x))
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
@@ -73,7 +67,7 @@ solve :: RandomGen g
       -> g
       -> Genotype
 solve !p !g =
-    let ep = evalPopulation p
+    let ep = popScore p
     in case (solutions ep) of
         (Just x) -> x
         Nothing -> 
