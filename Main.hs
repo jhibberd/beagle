@@ -1,7 +1,5 @@
 -- | Genetic Algorithm
 
-import Debug.Trace
-
 import qualified Beagle.Domain as D
 import Beagle.Eval
 import Beagle.Evolve
@@ -20,23 +18,12 @@ mkgenotype = f D.genotypeLength
                       (xs, g'') = f (n-1) g'
                   in (x:xs, g'')
 
--- | Calculate the delta (deviation) between the target phenotype and observed 
--- phenotype. The deviation is a float between zero and infinity: zero meaning
--- the candidate phenotype matched the target phenotype; infinity meaning that
--- the candidate couldn't be evaluated and therefore had no observable 
--- phenotype.
-getDelta :: (Genotype, Maybe Phenotype)
-         -> (Genotype, Maybe Phenotype, Delta)
-getDelta (gt, pt) = (gt, pt, d pt)
-    where d (Just pt') = abs (read pt' - D.targetPhenotype)
-          d Nothing    = 1/0 -- Infinity
-
 evalPopulation :: Population 
-               -> State Counters [(Genotype, Maybe Phenotype, Delta)]
+               -> State Counters [(Genotype, Score)]
 evalPopulation p = do
         modify . incrGenotypes . length $ p
-        return . sort . map (getDelta . eval) $ p
-    where sort = sortBy (\a b -> compare (delta a) (delta b))
+        return . sort . map eval $ p
+    where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
 -- genes. The size of the population is fixed and determined by the domain.
@@ -47,39 +34,39 @@ popSeed = f D.populationSize
                       (ps, g'') = f (n-1) g'
                   in (p:ps, g'')
 
--- | Filter an evaluated population to return only candidates whose phenotype
--- matches the target phenotype.
-solutions :: [(Genotype, Maybe Phenotype, Delta)] -> State Counters [Genotype]
-solutions p = do
-    let s = map (genotype) . filter (\gt -> delta gt == 0) $ p
-    modify . incrSolutions $ length s
-    return s
+-- | Given a list of genotypes and their evaluated scores, return the first
+-- genotype whose score is 0 (exhibits target phenotype), or Nothing if none
+-- can be found.
+solutions :: [(Genotype, Score)] -> Maybe Genotype
+solutions p =
+    case (map fst . filter (\gt -> snd gt == 0) $ p) of
+        [] -> Nothing
+        (x:xs) -> Just x
 
--- | Find n genotypes that exhibit target phenotypes, given a seed population
--- (p) and random generator (g).
+-- Given a seed population, intelligently evolve the population until a member
+-- exhibits the target phenotype.
 solve :: RandomGen g 
       => Population 
       -> g
-      -> Int
       -> Bool -- Use intelligent evolution function (or random).
-      -> State Counters [Genotype]
-solve _ _ 0 _ = return []
-solve p g n intel = do
+      -> State Counters Genotype
+solve p g intel = do
     ep <- evalPopulation p
-    let evolveF = case intel of
-            True -> evolve
-            False -> evolveR
-    let (nxp, g') = evolveF g ep
-    s <- solutions ep
-    s' <- solve nxp g' (n - length s) intel
-    return (s ++ s')
+    case (solutions ep) of
+        (Just x) -> return x
+        Nothing -> 
+            let evolveF = case intel of
+                    True -> evolve
+                    False -> evolveR
+                (nxp, g') = evolveF g ep
+            in solve nxp g' intel
 
 main = do 
     let (p, g') = popSeed R.g
     print "Intelligent evolution:"
-    let (sp, s) = runState (solve p g' D.numSolutions True) newCounters 
-    print $ (sp, stats s)
+    let (sp, s) = runState (solve p g' True) newCounters 
+    print $ (sp, s)
     print "Random evolution:"
-    let (sp, s) = runState (solve p g' D.numSolutions False) newCounters 
-    print $ (sp, stats s)
+    let (sp, s) = runState (solve p g' False) newCounters 
+    print $ (sp, s)
 

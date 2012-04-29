@@ -25,7 +25,7 @@ import System.Random
 -- better (at exhibiting the target phenotype).
 evolve :: RandomGen g
        => g
-       -> [(Genotype, Maybe Phenotype, Delta)]
+       -> [(Genotype, Score)]
        -> (Population, g)
 evolve g ps = f D.populationSize g
     where f 0 g = ([], g)
@@ -35,7 +35,7 @@ evolve g ps = f D.populationSize g
           make g = let ((a:b:[]), g') = R.pick mset 2 g -- pick pair to breed
                        (x, g'') = breed a b g'
                  in mutate x g'' -- mutate n genes to maintain variance
-          mset = multiset . map genotype $ ps
+          mset = multiset . map fst $ ps
 
 -- | Mutate n randomly chosen genes of a genotype to prevent the population
 -- from iteratively converging around a small subset of all available genes.
@@ -79,11 +79,11 @@ multiset = f . zip [1..] . reverse
 -- function.
 evolveR :: RandomGen g
        => g
-       -> [(Genotype, Maybe Phenotype, Delta)]
+       -> [(Genotype, Score)]
        -> (Population, g)
 evolveR g ps = f g ps
     where f g [] = ([], g)
-          f g (p:ps) = let (p', g') = mutate (genotype p) g
+          f g (p:ps) = let (p', g') = mutate (fst p) g
                            (ps', g'') = evolveR g' ps
                        in (p':ps', g'')
           mutate gt g = R.map (\_ g -> R.gene g) gt D.genotypeLength g
