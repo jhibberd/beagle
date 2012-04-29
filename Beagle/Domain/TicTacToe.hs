@@ -34,14 +34,12 @@ import System.IO.Unsafe
 import System.Random
 
 instance Typeable Mark where
-    typeOf N = mkTyConApp (mkTyCon3 "Beagle" "Domain" "N") []
-    typeOf X = mkTyConApp (mkTyCon3 "Beagle" "Domain" "X") []
-    typeOf O = mkTyConApp (mkTyCon3 "Beagle" "Domain" "O") []
+    typeOf _ = mkTyConApp (mkTyCon3 "Beagle" "Domain" "Mark") []
 
-genotypeLength =        50      :: Int
-mutationsPerGenotype =  2       :: Int
-populationSize =        100     :: Int
-randomSeed =            6       :: Int
+genotypeLength =        50     :: Int
+mutationsPerGenotype =  2      :: Int
+populationSize =        100    :: Int
+randomSeed =            6      :: Int
 
 data Gene = PlayA | PlayB | PlayC | PlayD | PlayE | PlayF | PlayG | PlayH
           | PlayI | IsAX | IsBX | IsCX | IsDX | IsEX | IsFX | IsGX | IsHX 
@@ -252,7 +250,7 @@ playGame :: (RandomGen g)
          -> Turn 
          -> (Bool, g)
 playGame f (_, grid) g t =
-    case getState (traceShow grid grid) of
+    case getState grid {-(traceShow grid grid)-} of
         Open -> case t of
                     XTurn -> let (b', g') = hostPlay grid g
                              in playGame f (toState b') g' OTurn

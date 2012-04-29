@@ -10,8 +10,6 @@ import Control.Monad.State
 import Data.List (sortBy)
 import System.Random
 
-import Debug.Trace
-
 -- | Create a new genotype consisting of randomly chosen genes.
 mkgenotype :: RandomGen g => g -> (Genotype, g)
 mkgenotype = f D.genotypeLength
@@ -24,7 +22,7 @@ evalPopulation :: Population
                -> State Counters [(Genotype, Score)]
 evalPopulation p = do
         modify . incrGenotypes . length $ p
-        return . sort . map eval $ traceShow p p
+        return . sort . map eval $ p
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
