@@ -29,10 +29,10 @@ evolve :: RandomGen g
        -> (Population, g)
 evolve g ps = f D.populationSize g
     where f 0 g = ([], g)
-          f n g = let (x, g') = make g
+          f n g = let (!x, g') = make g
                       (xs, g'') = f (n-1) g'
                   in (x:xs, g'')
-          make g = let ((a:b:[]), g') = R.pick mset 2 g -- pick pair to breed
+          make g = let (a:b:[], g') = R.pick mset 2 g -- pick pair to breed
                        (x, g'') = breed a b g'
                  in mutate x g'' -- mutate n genes to maintain variance
           mset = multiset . map fst $ ps
@@ -57,7 +57,7 @@ breed a b g = f (zip a b) g
     where f [] g = ([], g)
           f ((a, b):xs) g = let (switch, g') = randomR (True, False) g
                                 (xs', g'') = f xs g'
-                                x' = case switch of
+                                !x' = case switch of
                                     True -> a
                                     False -> b
                             in (x':xs', g'')   

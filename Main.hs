@@ -18,11 +18,17 @@ mkgenotype = f D.genotypeLength
                       (xs, g'') = f (n-1) g'
                   in (x:xs, g'')
 
+{-
 evalPopulation :: Population 
                -> State Counters [(Genotype, Score)]
 evalPopulation p = do
         modify . incrGenotypes . length $ p
         return . sort . map eval $ p
+    where sort = sortBy (\a b -> compare (snd a) (snd b))
+-}
+evalPopulation :: Population 
+               -> [(Genotype, Score)]
+evalPopulation p = sort . map eval $ p
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
@@ -45,6 +51,7 @@ solutions p =
 
 -- Given a seed population, intelligently evolve the population until a member
 -- exhibits the target phenotype.
+{-
 solve :: RandomGen g 
       => Population 
       -> g
@@ -60,13 +67,29 @@ solve p g intel = do
                     False -> evolveR
                 (nxp, g') = evolveF g ep
             in solve nxp g' intel
+-}
+solve :: RandomGen g 
+      => Population 
+      -> g
+      -> Genotype
+solve !p !g =
+    let ep = evalPopulation p
+    in case (solutions ep) of
+        (Just x) -> x
+        Nothing -> 
+            let (p', g') = evolve g ep
+            in solve p' g'
 
+-- TODO(jhibberd) Might be worth trying to reintroduce stats as state, provided
+-- that the algorithm still runs in constant space.
+{-
 main = do 
     let (p, g') = popSeed R.g
     print "Intelligent evolution:"
     let (sp, s) = runState (solve p g' True) newCounters 
     print $ (sp, s)
-    print "Random evolution:"
-    let (sp, s) = runState (solve p g' False) newCounters 
-    print $ (sp, s)
+-}
+main = do 
+    let (p, g') = popSeed R.g
+    print $ solve p g'
 
