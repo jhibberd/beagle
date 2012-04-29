@@ -4,7 +4,7 @@ module Beagle.Domain
     ( Gene(..)
     , genemap
     , genotypeLength
-    , targetPhenotype
+    , targetPhenotype -- TODO(jhibberd) Do we need this?
     , mutationsPerGenotype
     , populationSize
     , randomSeed
