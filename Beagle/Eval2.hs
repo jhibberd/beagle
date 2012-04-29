@@ -18,7 +18,8 @@ eval :: (Ord g, Show s, Show g)
      -> s -- Initial (or current, during recursive calls) state
      -> s -- Final state 
 eval gs gmap i s 
-    | i == length gs = {- trace (show gs ++ " -> " ++ show s) -} s
+    -- | i == length gs = {- trace (show gs ++ " -> " ++ show s) -} s
+    | i == length gs = trace (show "-> " ++ show s) s
     | otherwise = let (gs', i', s') = f gs i s
                   in eval gs' gmap i' s'
         where f = (Map.!) gmap (gs !! i)

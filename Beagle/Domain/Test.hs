@@ -12,12 +12,12 @@ import qualified Data.Map as Map
 
 -- | Data types and constants --------------------------------------------------
 
-genotypeLength =        15      :: Int
-mutationsPerGenotype =  1       :: Int
-populationSize =        30      :: Int
+genotypeLength =        500     :: Int
+mutationsPerGenotype =  5       :: Int
+populationSize =        100     :: Int
 randomSeed =            6       :: Int
 
-data Gene = Add | Subtract | Multiply | Divide | Incr | Decr | Empty
+data Gene = Add | Subtract | Multiply | Divide | Incr | Decr
     deriving (Ord, Eq, Show, Enum)
 type State = (Int, Int)
 
@@ -48,6 +48,6 @@ decr' gs gi (a, b) = (gs, gi+1, (a, max 0 (b-1)))
 
 score :: [Gene] -> Float
 score gs = score' $ eval gs gmap 0 initState
-    where score' = fromIntegral . fst
+    where score' = fromIntegral . abs . (123-) . fst
           initState = (0, 0)
 

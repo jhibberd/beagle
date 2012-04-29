@@ -3,15 +3,12 @@
 
 module Beagle.Evolve
     ( evolve
-    , evolveR
     ) where
 
 import qualified Beagle.Domain as D
 import qualified Beagle.Random as R
 import Beagle.Type
 import System.Random
-
--- | Intelligent ---------------------------------------------------------------
 
 -- TODO(jhibberd) Devise tests that can be run overnight that evaluate an 
 -- intelligent evolutionary algorithm compared with a random algorithm. Use
@@ -70,21 +67,4 @@ multiset :: Population -> [Genotype]
 multiset = f . zip [1..] . reverse 
     where f [] = []
           f ((i, x):xs) = replicate i x ++ f xs
-
--- | Random --------------------------------------------------------------------
-
--- | Basic evolve function that randomly selects another population of 
--- genotypes, making no effort to intelligently evolve upon its ancestors. This
--- function is used for comparison against the current "intelligent" evolve 
--- function.
-evolveR :: RandomGen g
-       => g
-       -> [(Genotype, Score)]
-       -> (Population, g)
-evolveR g ps = f g ps
-    where f g [] = ([], g)
-          f g (p:ps) = let (p', g') = mutate (fst p) g
-                           (ps', g'') = evolveR g' ps
-                       in (p':ps', g'')
-          mutate gt g = R.map (\_ g -> R.gene g) gt D.genotypeLength g
 
