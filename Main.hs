@@ -1,7 +1,7 @@
 -- | Genetic Algorithm
 
 import qualified Beagle.Domain as D
-import Beagle.Eval
+import Beagle.Eval2
 import Beagle.Evolve
 import qualified Beagle.Random as R
 import Beagle.Stat
@@ -28,7 +28,7 @@ evalPopulation p = do
 -}
 evalPopulation :: Population 
                -> [(Genotype, Score)]
-evalPopulation p = sort . map eval $ p
+evalPopulation p = sort . map (\x -> eval x 0 D.initState) $ p
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen

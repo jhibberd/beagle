@@ -4,5 +4,3 @@ solves a particular task.
 
 It's possible to solve this problem using sequential or randomised brute force,
 however this algorithm strives for a more "intelligent" solution.
-
-(this is my first haskell program so please excuse newbie mistakes.)
