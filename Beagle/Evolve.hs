@@ -8,6 +8,7 @@ module Beagle.Evolve
 import qualified Beagle.Domain as D
 import qualified Beagle.Random as R
 import Beagle.Type
+import Debug.Trace
 import System.Random
 
 -- TODO(jhibberd) Devise tests that can be run overnight that evaluate an 
@@ -36,8 +37,21 @@ evolve g ps = f D.populationSize g
 
 -- | Mutate n randomly chosen genes of a genotype to prevent the population
 -- from iteratively converging around a small subset of all available genes.
+--
+-- A 1% rate of mutation appears to work well. Too small and the population
+-- converges on a small gene pool; too large and the benefits of crossover are
+-- lost to random mutations.
 mutate :: RandomGen g => Genotype -> g -> (Genotype, g)
-mutate gt g = R.map (\_ g -> R.gene g) gt D.mutationsPerGenotype g 
+mutate gt g = R.map (\_ g -> R.gene g) gt numMutations g
+    where numMutations = ceiling $ (fromInteger D.genotypeLength) * mutationRate
+          mutationRate = 0.01
+
+
+emitBreedFlag = False
+emitBreed :: Genotype -> Genotype -> Genotype -> a -> a
+emitBreed a b c dummy
+    | emitBreedFlag == True = trace ("<breed a='" ++ show a ++ "' b='" ++ show b ++ "' c='" ++ show c ++ "'>") dummy
+    | emitBreedFlag == False = dummy
 
 -- | Breed two genotypes by creating a new genotype consisting of randonly
 -- selected genes from both parents. An equal number of genes will be picked 
@@ -50,7 +64,9 @@ mutate gt g = R.map (\_ g -> R.gene g) gt D.mutationsPerGenotype g
 -- [x, y, x, x, y, y]
 -- 
 breed :: RandomGen g => Genotype -> Genotype -> g -> (Genotype, g)
-breed a b g = f (zip a b) g 
+breed a b g = let (c, g') = f (zip a b) g
+                  c' = emitBreed a b c c
+              in (c', g')
     where f [] g = ([], g)
           f ((a, b):xs) g = let (switch, g') = randomR (True, False) g
                                 (xs', g'') = f xs g'

@@ -48,7 +48,7 @@ pick xs n g = let (ri, g') =   randomR range g
 -- list to an inner function (m). The inner function iterates over the composite
 -- list and applies the function (f) to all elements (x) whose index (i) appers
 -- in the random index list (now, hxs).
-map :: (RandomGen g) 
+map :: RandomGen g 
     => (a -> g -> (a, g))
     -> [a]
     -> Int

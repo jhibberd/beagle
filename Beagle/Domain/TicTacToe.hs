@@ -1,8 +1,4 @@
 
--- TODO(jhibberd) Maybe, if all problems could be modelled as functions that
--- take varying numbers of state as arguments and return state, the algorithm
--- would be easier to develop?
-
 -- TODO(jhibberd) Throw in lots of functions that could be useful and let the
 -- natural selection process pick the ones it finds most useful.
 
@@ -19,7 +15,6 @@
 module Beagle.Domain
     ( Gene(..)
     , genotypeLength
-    , mutationsPerGenotype
     , populationSize
     , randomSeed
     , score
@@ -31,8 +26,7 @@ import Debug.Trace
 import System.IO.Unsafe
 import System.Random
 
-genotypeLength =        50     :: Int
-mutationsPerGenotype =  2      :: Int
+genotypeLength =        20
 populationSize =        10     :: Int
 randomSeed =            6      :: Int
 
@@ -40,7 +34,7 @@ data Gene = PlayA | PlayB | PlayC | PlayD | PlayE | PlayF | PlayG | PlayH
           | PlayI | IsAX | IsBX | IsCX | IsDX | IsEX | IsFX | IsGX | IsHX 
           | IsIX | IsAO | IsBO | IsCO | IsDO | IsEO | IsFO | IsGO | IsHO
           | IsIO | IsAN | IsBN | IsCN | IsDN | IsEN | IsFN | IsGN | IsHN
-          | IsIN | IfTrue | IfFalse | Empty
+          | IsIN | IfTrue | IfFalse | Empty | End
           deriving (Ord, Eq, Show, Enum)
 
 gmap :: Map.Map Gene ([Gene] -> Int -> State -> ([Gene], Int, State))
@@ -83,7 +77,8 @@ gmap = Map.fromList [
     (IsIN,          isIN),
     (IfTrue,        ifTrue),
     (IfFalse,       ifFalse),
-    (Empty,         empty)
+    (Empty,         empty),
+    (End,           end)
     ]
 
 type Pos = Int
@@ -163,7 +158,7 @@ isIN = is 8 N
 --
 -- 
 
-ifTrue, ifFalse, empty :: [Gene] -> Int -> State -> ([Gene], Int, State)
+ifTrue, ifFalse, empty, end :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
 ifTrue gs gi (True, grid)   = (gs, gi+10, (True, grid))
 ifTrue gs gi (False, grid)  = (gs, gi+1, (False, grid))
@@ -172,6 +167,7 @@ ifFalse gs gi (True, grid)  = (gs, gi+1, (True, grid))
 ifFalse gs gi (False, grid) = (gs, gi+10, (False, grid))
 
 empty gs gi s = (gs, gi+1, s)
+end gs gi s = (gs, length gs, s)
 
 -- | Fitness function mechanics ================================================
 

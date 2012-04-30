@@ -1,7 +1,6 @@
 module Beagle.Domain
     ( Gene(..)
     , genotypeLength
-    , mutationsPerGenotype
     , populationSize
     , randomSeed
     , score
@@ -13,7 +12,6 @@ import qualified Data.Map as Map
 -- | Data types and constants --------------------------------------------------
 
 genotypeLength =        500     :: Int
-mutationsPerGenotype =  5       :: Int
 populationSize =        100     :: Int
 randomSeed =            6       :: Int
 

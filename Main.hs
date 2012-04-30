@@ -12,29 +12,25 @@ import System.Random
 import Debug.Trace
 import qualified Data.Map as Map
 
--- | Create a new genotype consisting of randomly chosen genes.
-mkgenotype :: RandomGen g => g -> (Genotype, g)
-mkgenotype = f D.genotypeLength
-    where f 0 g = ([], g)
-          f n g = let (x, g') = R.gene g
-                      (xs, g'') = f (n-1) g'
-                  in (x:xs, g'')
+-- | Create a new genotype consisting of 'Empty' genes. 
+--
+-- The genetic algorithm works better when starting with 'Empty' genes rather
+-- than starting with a sequence of randomly selected genes.
+blankGenotype :: [D.Gene]
+blankGenotype = replicate (fromIntegral D.genotypeLength) D.Empty
 
 -- | Using the domain's fitness function (D.score), calculate the score (a value
 -- between 0 and 1) of each genotype in the population. The resultant list of
 -- genotype/score pairs is sorted by score.
 popScore :: [Genotype] -> [(Genotype, Score)]
-popScore = sort . map (\x -> (x, D.score x))
+popScore = sort . map (\x -> let s = D.score x 
+                             in (x, trace ("  score: " ++ show s) s))
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
 -- genes. The size of the population is fixed and determined by the domain.
-popSeed :: RandomGen g => g -> (Population, g)
-popSeed = f D.populationSize
-    where f 0 g = ([], g)
-          f n g = let (p, g') =   mkgenotype g
-                      (ps, g'') = f (n-1) g'
-                  in (p:ps, g'')
+popSeed :: Population
+popSeed = replicate D.populationSize blankGenotype
 
 -- Experimental
 
@@ -103,7 +99,7 @@ solve !p !g !hist =
                 hist' = addToHist s hist
                 ep' = traceShow s ep
                 (p', g') = case isLocalOptima hist' of
-                    True -> popSeed g
+                    True -> (popSeed, g)
                     False -> evolve g ep'
             in solve p' g' hist'
 
@@ -117,6 +113,5 @@ main = do
     print $ (sp, s)
 -}
 main = do 
-    let (p, g') = popSeed R.g
-    print $ solve p g' []
+    print $ solve popSeed R.g []
 
