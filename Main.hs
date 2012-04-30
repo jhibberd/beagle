@@ -2,8 +2,8 @@
 
 import qualified Beagle.Domain as D
 import Beagle.Evolve
+import qualified Beagle.Log as L
 import qualified Beagle.Random as R
-import Beagle.Stat
 import Beagle.Type
 import Control.Monad.State
 import Data.List (sortBy, genericLength)
@@ -23,8 +23,7 @@ blankGenotype = replicate (fromIntegral D.genotypeLength) D.Empty
 -- between 0 and 1) of each genotype in the population. The resultant list of
 -- genotype/score pairs is sorted by score.
 popScore :: [Genotype] -> [(Genotype, Score)]
-popScore = sort . map (\x -> let s = D.score x 
-                             in (x, trace ("  score: " ++ show s) s))
+popScore = sort . map (\x -> let s = D.score x in (x, L.score s s))
     where sort = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
@@ -88,10 +87,11 @@ solve p g intel = do
 solve :: RandomGen g 
       => Population 
       -> g
+      -> Int -- Generation
       -> [(Score, Int)]
       -> Genotype
-solve !p !g !hist =
-    let ep = popScore p
+solve !p !g !gen !hist =
+    let ep = L.generation gen (popScore p)
     in case (solutions ep) of
         (Just x) -> x
         Nothing -> 
@@ -101,7 +101,7 @@ solve !p !g !hist =
                 (p', g') = case isLocalOptima hist' of
                     True -> (popSeed, g)
                     False -> evolve g ep'
-            in solve p' g' hist'
+            in solve p' g' (gen+1) hist'
 
 -- TODO(jhibberd) Might be worth trying to reintroduce stats as state, provided
 -- that the algorithm still runs in constant space.
@@ -113,5 +113,6 @@ main = do
     print $ (sp, s)
 -}
 main = do 
-    print $ solve popSeed R.g []
+    L.setUp
+    print $ solve popSeed R.g 1 []
 

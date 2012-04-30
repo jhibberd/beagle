@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 
 -- | Data types and constants --------------------------------------------------
 
-genotypeLength =        500
+genotypeLength =        50
 populationSize =        100     :: Int
 randomSeed =            6       :: Int
 

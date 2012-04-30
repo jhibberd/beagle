@@ -2,8 +2,8 @@ module Beagle.Eval
     ( eval
     ) where
 
+import qualified Beagle.Log as L
 import qualified Data.Map as Map
-import Debug.Trace
 
 -- | Runs an initial state through a gene sequence and returns the final state.
 --
@@ -18,7 +18,7 @@ eval :: (Ord g, Show s, Show g)
      -> s -- Initial (or current, during recursive calls) state
      -> s -- Final state 
 eval gs gmap i s 
-    | i >= length gs = trace ("eval: " ++ show gs ++ " -> " ++ show s) s
+    | i >= length gs = L.eval gs s s
     | otherwise = let (gs', i', s') = f gs i s
                   in eval gs' gmap i' s'
         where f = (Map.!) gmap (gs !! i)
