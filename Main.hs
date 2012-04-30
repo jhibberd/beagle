@@ -1,7 +1,6 @@
 -- | Genetic Algorithm
 
 import qualified Beagle.Domain as D
-import Beagle.Eval2
 import Beagle.Evolve
 import qualified Beagle.Random as R
 import Beagle.Stat
@@ -58,7 +57,7 @@ isLocalOptima xs
                       False -> False
 
 stalePop :: (Float, Int) -> Bool
-stalePop (a, n) = n > 70 && a < 50
+stalePop (a, n) = n > 70 && a < 0.99
 
 -- END
 
@@ -120,3 +119,4 @@ main = do
 main = do 
     let (p, g') = popSeed R.g
     print $ solve p g' []
+
