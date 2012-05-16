@@ -7,14 +7,14 @@ module Beagle.Domain
     , score
     ) where
 
-import Beagle.Eval2
+import Beagle.Eval
 import qualified Data.Map as Map
 
 -- | Data types and constants --------------------------------------------------
 
-genotypeLength =        15      :: Int
-mutationsPerGenotype =  1       :: Int
-populationSize =        30      :: Int
+genotypeLength =        500     :: Int
+mutationsPerGenotype =  5       :: Int
+populationSize =        100     :: Int
 randomSeed =            6       :: Int
 
 data Gene = RotateR | RotateL | SwapR | SwapL | MoveR | MoveL | Empty

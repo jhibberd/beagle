@@ -18,81 +18,73 @@
 
 module Beagle.Domain
     ( Gene(..)
-    , genemap
     , genotypeLength
     , mutationsPerGenotype
     , populationSize
     , randomSeed
-    , runner
+    , score
     ) where
 
-import Data.Dynamic
+import Beagle.Eval
 import qualified Data.Map as Map
 import Debug.Trace
-import Data.Typeable
 import System.IO.Unsafe
 import System.Random
 
-instance Typeable Mark where
-    typeOf _ = mkTyConApp (mkTyCon3 "Beagle" "Domain" "Mark") []
-
 genotypeLength =        50     :: Int
 mutationsPerGenotype =  2      :: Int
-populationSize =        100    :: Int
+populationSize =        10     :: Int
 randomSeed =            6      :: Int
 
 data Gene = PlayA | PlayB | PlayC | PlayD | PlayE | PlayF | PlayG | PlayH
           | PlayI | IsAX | IsBX | IsCX | IsDX | IsEX | IsFX | IsGX | IsHX 
           | IsIX | IsAO | IsBO | IsCO | IsDO | IsEO | IsFO | IsGO | IsHO
           | IsIO | IsAN | IsBN | IsCN | IsDN | IsEN | IsFN | IsGN | IsHN
-          | IsIN | Branch | Or | And | DoNothing | Empty
+          | IsIN | IfTrue | IfFalse | Empty
           deriving (Ord, Eq, Show, Enum)
 
-genemap :: Map.Map Gene (Dynamic, Int)
-genemap = Map.fromList [
-    (PlayA,         (toDyn playA,       1)),
-    (PlayB,         (toDyn playB,       1)),
-    (PlayC,         (toDyn playC,       1)),
-    (PlayD,         (toDyn playD,       1)),
-    (PlayE,         (toDyn playE,       1)),
-    (PlayF,         (toDyn playF,       1)),
-    (PlayG,         (toDyn playG,       1)),
-    (PlayH,         (toDyn playH,       1)),
-    (PlayI,         (toDyn playI,       1)),
-    (IsAX,          (toDyn isAX,        1)),
-    (IsBX,          (toDyn isBX,        1)),
-    (IsCX,          (toDyn isCX,        1)),
-    (IsDX,          (toDyn isDX,        1)),
-    (IsEX,          (toDyn isEX,        1)),
-    (IsFX,          (toDyn isFX,        1)),
-    (IsGX,          (toDyn isGX,        1)),
-    (IsHX,          (toDyn isHX,        1)),
-    (IsIX,          (toDyn isIX,        1)),
-    (IsAO,          (toDyn isAO,        1)),
-    (IsBO,          (toDyn isBO,        1)),
-    (IsCO,          (toDyn isCO,        1)),
-    (IsDO,          (toDyn isDO,        1)),
-    (IsEO,          (toDyn isEO,        1)),
-    (IsFO,          (toDyn isFO,        1)),
-    (IsGO,          (toDyn isGO,        1)),
-    (IsHO,          (toDyn isHO,        1)),
-    (IsIO,          (toDyn isIO,        1)),
-    (IsAN,          (toDyn isAN,        1)),
-    (IsBN,          (toDyn isBN,        1)),
-    (IsCN,          (toDyn isCN,        1)),
-    (IsDN,          (toDyn isDN,        1)),
-    (IsEN,          (toDyn isEN,        1)),
-    (IsFN,          (toDyn isFN,        1)),
-    (IsGN,          (toDyn isGN,        1)),
-    (IsHN,          (toDyn isHN,        1)),
-    (IsIN,          (toDyn isIN,        1)),
-    (Branch,        (toDyn branch,      3)),
-    (Or,            (toDyn or',         2)),
-    (And,           (toDyn and',        2)),
-    (DoNothing,     (toDyn doNothing,   1))
+gmap :: Map.Map Gene ([Gene] -> Int -> State -> ([Gene], Int, State))
+gmap = Map.fromList [
+    (PlayA,         playA),
+    (PlayB,         playB),
+    (PlayC,         playC),
+    (PlayD,         playD),
+    (PlayE,         playE),
+    (PlayF,         playF),
+    (PlayG,         playG),
+    (PlayH,         playH),
+    (PlayI,         playI),
+    (IsAX,          isAX),
+    (IsBX,          isBX),
+    (IsCX,          isCX),
+    (IsDX,          isDX),
+    (IsEX,          isEX),
+    (IsFX,          isFX),
+    (IsGX,          isGX),
+    (IsHX,          isHX),
+    (IsIX,          isIX),
+    (IsAO,          isAO),
+    (IsBO,          isBO),
+    (IsCO,          isCO),
+    (IsDO,          isDO),
+    (IsEO,          isEO),
+    (IsFO,          isFO),
+    (IsGO,          isGO),
+    (IsHO,          isHO),
+    (IsIO,          isIO),
+    (IsAN,          isAN),
+    (IsBN,          isBN),
+    (IsCN,          isCN),
+    (IsDN,          isDN),
+    (IsEN,          isEN),
+    (IsFN,          isFN),
+    (IsGN,          isGN),
+    (IsHN,          isHN),
+    (IsIN,          isIN),
+    (IfTrue,        ifTrue),
+    (IfFalse,       ifFalse),
+    (Empty,         empty)
     ]
-
-runner =            (toDyn runner',     1 :: Int)
 
 type Pos = Int
 data Mark = N | X | O deriving (Eq, Show)
@@ -105,13 +97,14 @@ type State = (Bool, Grid)
 
 -- | Functions for making a move -----------------------------------------------
 
-playA, playB, playC, playD, playE, playF, playG, playH, playI :: State -> State
+playA, playB, playC, playD, playE, playF, playG, playH, playI 
+    :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
-play :: Mark -> Pos -> State -> State
-play m p (_, grid) 
-    | grid !! p /= N = toState grid -- skip move
+play :: Mark -> Pos -> [Gene] -> Int -> State -> ([Gene], Int, State)
+play m p gs gi (_, grid) 
+    | grid !! p /= N = (gs, gi+1, toState grid) -- skip move
     | otherwise = let (x,_:xs) = splitAt p grid 
-                  in toState (x++(m:xs))
+                  in (gs, gi+1, toState (x++(m:xs)))
 
 playA = play O 0
 playB = play O 1
@@ -125,12 +118,15 @@ playI = play O 8
 
 -- | Functions for determining the current board state -------------------------
 
-isAX, isBX, isCX, isDX, isEX, isFX, isGX, isHX, isIX :: State -> State 
-isAO, isBO, isCO, isDO, isEO, isFO, isGO, isHO, isIO :: State -> State
-isAN, isBN, isCN, isDN, isEN, isFN, isGN, isHN, isIN :: State -> State
+isAX, isBX, isCX, isDX, isEX, isFX, isGX, isHX, isIX 
+    :: [Gene] -> Int -> State -> ([Gene], Int, State)   
+isAO, isBO, isCO, isDO, isEO, isFO, isGO, isHO, isIO 
+    :: [Gene] -> Int -> State -> ([Gene], Int, State)
+isAN, isBN, isCN, isDN, isEN, isFN, isGN, isHN, isIN 
+    :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
-is :: Pos -> Mark -> State -> State
-is p m (_, grid) = (grid !! p == m, grid)
+is :: Pos -> Mark -> [Gene] -> Int -> State -> ([Gene], Int, State)
+is p m gs gi (_, grid) = (gs, gi+1, (grid !! p == m, grid))
 
 isAX = is 0 X 
 isBX = is 1 X 
@@ -162,21 +158,20 @@ isIN = is 8 N
 
 -- | Functions for controlling program flow ------------------------------------
 
-branch :: State -> State -> State -> State
-branch (True, _) x _ = x
-branch (False, _) _ x = x
+-- TODO(jhibberd) Implement basic logic using single interface:
+-- [Gene] -> Int -> State -> ([Gene], Int, State)
+--
+-- 
 
-or' :: State -> State -> State
-or' (True, x) _ = (True, x)
-or' _ (True, x) = (True, x)
-or' (False, x) _ = (False, x)
+ifTrue, ifFalse, empty :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
-and' :: State -> State -> State
-and' (True, x) (True, _) = (True, x)
-and' (_, x) _ = (False, x)
+ifTrue gs gi (True, grid)   = (gs, gi+10, (True, grid))
+ifTrue gs gi (False, grid)  = (gs, gi+1, (False, grid))
 
-doNothing :: State -> State
-doNothing = id
+ifFalse gs gi (True, grid)  = (gs, gi+1, (True, grid))
+ifFalse gs gi (False, grid) = (gs, gi+10, (False, grid))
+
+empty gs gi s = (gs, gi+1, s)
 
 -- | Fitness function mechanics ================================================
 
@@ -213,30 +208,32 @@ doesXWin _ = False
 hostPlay :: (RandomGen g) => Grid -> g -> (Grid, g)
 hostPlay grid g = let (i, g') = randomR (0, (length freeonly)-1) g
                       i'' = freeonly !! i
-                  in (fromState $ play X i'' (toState grid), g')
+                      (_, _, (_, grid')) = play X i'' [] 0 (toState grid)
+                  in (grid', g')
     where zipped = zip grid [0..]
           freeonly = map snd $ filter ((==N) . fst) zipped
 
-toScore :: Int -> Float
-toScore = (/10) . fromIntegral
+toScore :: [Int] -> Float
+toScore xs = 1 - (1 / (fromIntegral $ (sum xs +1))) 
 
-numLoses :: [Bool] -> Int
-numLoses = length . filter (==False)
+-- TODO(jhibberd) Cleanup (and abstract?) local optima work.
+-- TODO(jhibberd) Calculate num. mutations per genotype at 5% rate
+--                Time with and w/0 to ensure correct implementation.
 
-runner' :: (State -> State) -> Float
-runner' f = toScore . numLoses $ runner'' f numGames g OTurn
+score :: [Gene] -> Float
+score gs = toScore $ runner'' gs numGames g OTurn
     where g = mkStdGen 6
-          numGames = 3
+          numGames = 1
 
 runner'' :: (RandomGen g) 
-         => (State -> State) 
+         => [Gene] 
          -> Int 
          -> g 
          -> Turn 
-         -> [Bool]
+         -> [Int]
 runner'' _ 0 _ _ = []
-runner'' f n g t = let (outcome, g') = playGame f newGrid g t 
-                   in outcome: runner'' f (n-1) g' nextT
+runner'' gs n g t = let (outcome, g') = playGame gs newGrid g 0 t 
+                    in outcome: runner'' gs (n-1) g' nextT
     where newGrid = toState (replicate 9 N)
           nextT = case t of
                       XTurn -> OTurn
@@ -244,28 +241,29 @@ runner'' f n g t = let (outcome, g') = playGame f newGrid g t
 
 -- TODO(jhibberd) Should probably be win=3, draw=1, loss=0
 playGame :: (RandomGen g) 
-         => (State -> State) 
+         => [Gene] 
          -> State 
-         -> g 
+         -> g
+         -> Int -- Number of turns taken
          -> Turn 
-         -> (Bool, g)
-playGame f (_, grid) g t =
-    case getState grid {-(traceShow grid grid)-} of
+         -> (Int, g)
+playGame gs (_, grid) g nt t =
+    case getState (traceShow grid grid) of
         Open -> case t of
                     XTurn -> let (b', g') = hostPlay grid g
-                             in playGame f (toState b') g' OTurn
-                    OTurn -> playGame f (f $ toState grid) g XTurn
-        XWins -> (False, g)
-        OWins -> (True, g)
-        Draw -> (False, g)
+                             in playGame gs (toState b') g' (nt+1) OTurn
+                    OTurn -> let s = eval gs gmap 0 $ toState grid
+                             in case didMoveCorrectly s (nt+1) of
+                                    False -> (25-nt, g)
+                                    True -> playGame gs s g (nt+1) XTurn
+        XWins -> (0, g)
+        OWins -> (10, g)
+        Draw -> (5, g)
+
+didMoveCorrectly :: State -> Int -> Bool
+didMoveCorrectly (_, grid) numTurns = (length $ filter (/=N) grid) == numTurns 
 
 -- | Manual testing of the runner ----------------------------------------------
 
--- | Mock genotype that allows the user to manually control how the genotype
--- behaves.
-mockF :: State -> State
-mockF (_, grid) = let i = read .unsafePerformIO $ getLine
-                  in play O i (toState grid)
-
-main = print $ runner' mockF 
+main = print $ score [IsIX, IfTrue, PlayA]
 
