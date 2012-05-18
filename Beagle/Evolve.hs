@@ -6,18 +6,14 @@ module Beagle.Evolve
     ) where
 
 import qualified Beagle.Domain as D
-import qualified Beagle.Log as L
+import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
-import Beagle.Type
 import Data.List
 import System.Random
 
--- TODO(jhibberd) Devise tests that can be run overnight that evaluate an 
--- intelligent evolutionary algorithm compared with a random algorithm. Use
--- this to determine algorithm "progress".
-
--- TODO(jhibberd) Need unit tests and detailed logging so it's possible to see
--- the evolutionary path of genotypes.
+type Genotype = [D.Gene]
+type Population = [Genotype]
+type Score = Float
 
 -- | Given a population of genotypes and their observed phenotypes, generate a
 -- new population (generation) that will *probably* or *logically* perform 
@@ -25,15 +21,17 @@ import System.Random
 evolve :: RandomGen g
        => g
        -> [(Genotype, Score)]
-       -> (Population, g)
+       -> IO (Population, g)
 evolve g ps = f D.populationSize g
-    where f 0 g = ([], g)
-          f n g = let (!x, g') = make g
-                      (xs, g'') = f (n-1) g'
-                  in (x:xs, g'')
-          make g = let (a:b:[], g') = pair g -- pick pair to breed
-                       (x, g'') = breed a b g'
-                 in mutate x g'' -- mutate n genes to maintain variance
+    where f 0 g = return ([], g)
+          f n g = do
+              (!x, g') <- make g
+              (xs, g'') <- f (n-1) g'
+              return (x:xs, g'')
+          make g = do
+              let (a:b:[], g') = pair g -- pick pair to breed
+              (x, g'') <- breed a b g'
+              return (mutate x g'') -- mutate n genes to maintain variance
           mset = multiset . nub . map fst $ ps
           pair g
               | length mset > 1 = R.pick mset 2 g
@@ -60,9 +58,11 @@ mutate gt g = R.map (\_ g -> R.gene g) gt numMutations g
 -- =>
 -- [x, y, x, x, y, y]
 -- 
-breed :: RandomGen g => Genotype -> Genotype -> g -> (Genotype, g)
-breed a b g = let (c, g') = f (zip a b) g
-              in (L.breed a b c c, g')
+breed :: RandomGen g => Genotype -> Genotype -> g -> IO (Genotype, g)
+breed a b g = do
+        let (c, g') = f (zip a b) g
+        Log.breed a b c
+        return (c, g')
     where f [] g = ([], g)
           f ((a, b):xs) g = let (switch, g') = randomR (True, False) g
                                 (xs', g'') = f xs g'

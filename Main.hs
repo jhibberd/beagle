@@ -2,15 +2,18 @@
 
 import qualified Beagle.Domain as D
 import Beagle.Evolve
-import qualified Beagle.Log as L
+import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
-import Beagle.Type
-import Control.Monad.State
+--import Beagle.Type
 import Data.List (sortBy, genericLength)
 import System.Random
 
 import Debug.Trace
 import qualified Data.Map as Map
+
+type Genotype = [D.Gene]
+type Population = [Genotype]
+type Score = Float
 
 -- | Create a new genotype consisting of 'Empty' genes. 
 --
@@ -22,9 +25,13 @@ blankGenotype = replicate (fromIntegral D.genotypeLength) D.Empty
 -- | Using the domain's fitness function (D.score), calculate the score (a value
 -- between 0 and 1) of each genotype in the population. The resultant list of
 -- genotype/score pairs is sorted by score.
-popScore :: [Genotype] -> [(Genotype, Score)]
-popScore = sort . map (\x -> let s = D.score x in (x, L.score s s))
+popScore :: [Genotype] -> IO [(Genotype, Score)]
+popScore = fmap sort . sequence . map score
     where sort = sortBy (\a b -> compare (snd a) (snd b))
+          score x = do
+              s <- D.score x
+              Log.score x s
+              return (x, s)
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
 -- genes. The size of the population is fixed and determined by the domain.
@@ -67,52 +74,27 @@ solutions p =
 
 -- Given a seed population, intelligently evolve the population until a member
 -- exhibits the target phenotype.
-{-
-solve :: RandomGen g 
-      => Population 
-      -> g
-      -> Bool -- Use intelligent evolution function (or random).
-      -> State Counters Genotype
-solve p g intel = do
-    ep <- evalPopulation p
-    case (solutions ep) of
-        (Just x) -> return x
-        Nothing -> 
-            let evolveF = case intel of
-                    True -> evolve
-                    False -> evolveR
-                (nxp, g') = evolveF g ep
-            in solve nxp g' intel
--}
 solve :: RandomGen g 
       => Population 
       -> g
       -> Int -- Generation
       -> [(Score, Int)]
-      -> Genotype
-solve !p !g !gen !hist =
-    let ep = L.generation gen (popScore p)
-    in case (solutions ep) of
-        (Just x) -> x
-        Nothing -> 
+      -> IO Genotype
+solve !p !g !gen !hist = do
+    Log.generation gen p
+    ep <- popScore p
+    case (solutions ep) of
+        (Just x) -> return x
+        Nothing -> do
             let s = modeAvg (map snd ep) Map.empty
                 hist' = addToHist s hist
                 ep' = traceShow s ep
-                (p', g') = case isLocalOptima hist' of
-                    True -> (popSeed, g)
-                    False -> evolve g ep'
-            in solve p' g' (gen+1) hist'
+            (p', g') <- case isLocalOptima hist' of
+                True -> return (popSeed, g)
+                False -> evolve g ep'
+            solve p' g' (gen+1) hist'
 
--- TODO(jhibberd) Might be worth trying to reintroduce stats as state, provided
--- that the algorithm still runs in constant space.
-{-
 main = do 
-    let (p, g') = popSeed R.g
-    print "Intelligent evolution:"
-    let (sp, s) = runState (solve p g' True) newCounters 
-    print $ (sp, s)
--}
-main = do 
-    L.setUp
-    print $ solve popSeed R.g 1 []
+    Log.setUp
+    solve popSeed R.g 1 []
 

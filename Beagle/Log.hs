@@ -1,4 +1,7 @@
--- | Functions that write debug information to log files.
+-- | To improve insight into how the genetic algorithm is evolving the 
+-- genotypes key events are written to log files.
+--
+-- Each file holds data on a single event type for a single generation.
 
 module Beagle.Log
     ( generation
@@ -8,53 +11,57 @@ module Beagle.Log
     , breed
     ) where
 
--- | TODO(jhibberd) Just use builting int hashing function for now.
--- | TODO(jhibberd) Different files for different event types.
--- | TODO(jhibberd) Try and introduce proper IO whilst keeping the program
--- running in constant space.
-
 import Data.HashTable
 import System.Directory
-import System.IO.Unsafe
 
--- | File to keep track of the current generation
-generationFile = "/tmp/beagle/generation"
-
--- | Update the log file.
-write :: String -> String -> b -> b
-write path txt dum = const dum $! unsafePerformIO $ 
-    appendFile path (txt ++ "\n\n")
-
+-- | Algorithm has been started.
 setUp :: IO ()
 setUp = do
-    removeDirectoryRecursive "/tmp/beagle"
-    createDirectory "/tmp/beagle"
-
-updateGeneration :: Int -> IO ()
-updateGeneration i = writeFile "/tmp/beagle/generation" (show i)
-
-mockIO :: IO a -> b -> b
-mockIO io dum = const dum $! unsafePerformIO $ io
+    removeDirectoryRecursive logDir
+    createDirectory logDir
 
 -- | A new generation has begun.
-generation :: Int -> a -> a
-generation !gen = mockIO $ updateGeneration gen
+-- Increment the generation count and log all the genotypes (against their
+-- hashes).
+generation :: (Show a) => Int -> [a] -> IO ()
+generation !gen ps = do
+        writeFile generationFile (show gen)
+        p <- logPath "genotype"
+        sequence $ map (writeGenotype p) ps
+        return ()
+    where writeGenotype p gt = write p (hash gt ++ "," ++ show gt)
+
+-- | A genotype has been evaluated.
+eval :: (Show a, Show b) => [a] -> b -> IO ()
+eval !gt !s = do
+    p <- logPath "eval"
+    write p (hash gt ++ "," ++ show s)
+
+-- | A genotype has been scored.
+score :: (Show a) => [a] -> Float -> IO ()
+score !gt !s = do
+    p <- logPath "score"
+    write p (hash gt ++ "," ++ show s)
+
+-- | Two genotypes have been bred together.
+breed :: (Show a) => [a] -> [a] -> [a] -> IO ()
+breed !a !b !c = do 
+    p <- logPath "breed"
+    write p (hash a ++ "," ++ hash b ++ "," ++ hash c)
+
+-- | Helpers and constants -----------------------------------------------------
+
+logDir = "/tmp/beagle"
+generationFile = logDir ++  "/generation"
+
+write :: String -> String -> IO ()
+write path txt = appendFile path (txt ++ "\n")
 
 logPath :: String -> IO String
 logPath fileType = do
-    g <- readFile "/tmp/beagle/generation"
-    return ("/tmp/beagle/" ++ g ++ "." ++ fileType)
+    g <- readFile generationFile
+    return (logDir ++ "/" ++ g ++ "." ++ fileType)
 
--- | A genotype has been evaluated.
-eval :: (Show a, Show b) => [a] -> b -> c -> c
-eval !gs !s = write (unsafePerformIO $ logPath "eval") ((show . hashString $ show gs) ++ "," ++ show s)
-
--- | A genotype has been scored.
-score :: Float -> b -> b
-score !s = write (unsafePerformIO $ logPath "score") ("Score " ++ show s)
-
--- | Two genotypes have been bred together.
-breed :: (Show a) => [a] -> [a] -> [a] -> b -> b
-breed !a !b !c = 
-    write (unsafePerformIO $ logPath "breed") ("Breed " ++ show a ++ " + " ++ show b ++ " = " ++ show c)
+hash :: (Show a) => a -> String
+hash = show . hashString . show
 

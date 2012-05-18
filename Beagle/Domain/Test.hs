@@ -46,8 +46,10 @@ empty gs gi s           = (gs, gi+1, s)
 
 -- | Scoring function ----------------------------------------------------------
 
-score :: [Gene] -> Float
-score gs = score' $ eval gs gmap 0 initState
+score :: [Gene] -> IO Float
+score gs = do
+        finalState <- eval gs gmap 0 initState
+        return (score' finalState)
     where score' = norm . fromIntegral . abs . (123-) . fst
           initState = (0, 0)
           norm x = 1 - (1/(x+1)) -- not linear!
