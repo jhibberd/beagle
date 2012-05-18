@@ -13,6 +13,7 @@ module Beagle.Log
 -- | TODO(jhibberd) Try and introduce proper IO whilst keeping the program
 -- running in constant space.
 
+import Data.HashTable
 import System.Directory
 import System.IO.Unsafe
 
@@ -20,10 +21,9 @@ import System.IO.Unsafe
 generationFile = "/tmp/beagle/generation"
 
 -- | Update the log file.
-write :: String -> b -> b
-write txt dum = const dum $! unsafePerformIO $ 
-    appendFile logFile (txt ++ "\n\n")
-    where logFile = unsafePerformIO currentLog
+write :: String -> String -> b -> b
+write path txt dum = const dum $! unsafePerformIO $ 
+    appendFile path (txt ++ "\n\n")
 
 setUp :: IO ()
 setUp = do
@@ -40,20 +40,21 @@ mockIO io dum = const dum $! unsafePerformIO $ io
 generation :: Int -> a -> a
 generation !gen = mockIO $ updateGeneration gen
 
-currentLog :: IO String
-currentLog = do
+logPath :: String -> IO String
+logPath fileType = do
     g <- readFile "/tmp/beagle/generation"
-    return ("/tmp/beagle/" ++ g)
+    return ("/tmp/beagle/" ++ g ++ "." ++ fileType)
 
 -- | A genotype has been evaluated.
 eval :: (Show a, Show b) => [a] -> b -> c -> c
-eval !gs !s = write ("Eval " ++ show gs ++ " -> " ++ show s)
+eval !gs !s = write (unsafePerformIO $ logPath "eval") ((show . hashString $ show gs) ++ "," ++ show s)
 
 -- | A genotype has been scored.
 score :: Float -> b -> b
-score !s = write ("Score " ++ show s)
+score !s = write (unsafePerformIO $ logPath "score") ("Score " ++ show s)
 
 -- | Two genotypes have been bred together.
 breed :: (Show a) => [a] -> [a] -> [a] -> b -> b
 breed !a !b !c = 
-    write ("Breed " ++ show a ++ " + " ++ show b ++ " = " ++ show c)
+    write (unsafePerformIO $ logPath "breed") ("Breed " ++ show a ++ " + " ++ show b ++ " = " ++ show c)
+
