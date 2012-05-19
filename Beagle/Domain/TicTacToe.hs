@@ -205,6 +205,9 @@ type State =
 playA, playB, playC, playD, playE, playF, playG, playH, playI 
     :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
+-- TODO(jhibberd) All it takes is one of these for a position that is already
+-- taken and that essentially junks the genotype. Instead try skipping to the
+-- next gene if the position is already take - like 'empty'.
 play :: Mark -> Pos -> [Gene] -> Int -> State -> ([Gene], Int, State)
 play m p gs gi (fa, fb, fs, ba, bb, grid) 
     | grid !! p /= N = (gs, length gs, (fa, fb, fs, ba, bb, grid)) -- skip move

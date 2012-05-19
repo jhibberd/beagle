@@ -9,16 +9,24 @@
                 white-space: nowrap;
             }
             
-            gene-type-parent-a {
-                color: Green;
+            gene-state-on {
+                color: #000;
+            }
+            gene-state-off {
+                color: #bbb;
+            }
+            gene-state-mutant {
+                color: #ff0000;
             }
 
-            gene-type-parent-b {
-                color: Red;
+            evolutionary-regression {
+                color: #ff0000;
             }
-
-            gene-type-mutation {
-                color: Blue;
+            evolutionary-progression {
+                color: #00ff00;
+            }
+            evolutionary-stasis {
+                color: #bbb;
             }
 
         </style>
@@ -29,10 +37,12 @@
         <br />
         {% for (genotype_a, score_a), \
                (genotype_b, score_b), \
-               (genotype_c, score_c) in content %}
-            {% raw genotype_a %} {{ score_a }} <br /> 
-            {% raw genotype_b %} {{ score_b }} <br /> 
-            {% raw genotype_c %} {{ score_c }} <br /><br /> 
+               (genotype_c, score_c), \
+               score_diff in content %}
+            {% raw score_a %} {% raw genotype_a %}<br /> 
+            {% raw score_b %} {% raw genotype_b %}<br /> 
+            {% raw score_c %} {% raw genotype_c %}<br />
+            {% raw score_diff %}<br /><br />
         {% end %}
     </body>
 </html>

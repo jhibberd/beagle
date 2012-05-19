@@ -1,11 +1,12 @@
+import random
 import tornado.ioloop
 import tornado.web
 
-class GeneAncestry(object):
-    """Ancestry of a gene within a genotype (used for color-coding)."""
-    ParentA =   0
-    ParentB =   1
-    Mutation =  2
+class GeneState(object):
+    """The state (color) used when rendering a gene."""
+    On =        0
+    Off =       1
+    Mutant =    2
 
 
 class MainHandler(tornado.web.RequestHandler):
@@ -34,29 +35,33 @@ class MainHandler(tornado.web.RequestHandler):
             genotype_b, score_b = lookup(b)
             genotype_c, score_c = lookup_next(c)
 
+            states = self.get_states(genotype_a, genotype_b, genotype_c)
+            states_a, states_b, states_c = zip(*states)
+
             longest_gene = self.longest_gene([
                 genotype_a, genotype_b, genotype_c])
-
-            # TODO(jhibberd) For efficiency add padding after calculating ancestry.
             genotype_a = self.pad_genes(longest_gene, genotype_a)
             genotype_b = self.pad_genes(longest_gene, genotype_b)
             genotype_c = self.pad_genes(longest_gene, genotype_c)
 
-            genotype_c = self.mark_ancestry_diff(genotype_c, genotype_a, genotype_b) 
-            genotype_a = self.mark_ancestry_all(genotype_a, GeneAncestry.ParentA)
-            genotype_b = self.mark_ancestry_all(genotype_b, GeneAncestry.ParentB)
+            genotype_a = self.markup_ancestry(genotype_a, states_a) 
+            genotype_b = self.markup_ancestry(genotype_b, states_b) 
+            genotype_c = self.markup_ancestry(genotype_c, states_c) 
 
-            genotype_a = self.markup_ancestry(genotype_a) 
-            genotype_b = self.markup_ancestry(genotype_b) 
-            genotype_c = self.markup_ancestry(genotype_c) 
-
-            # TODO(jhibberd) Join genotypes before rendering.
-            # TODO(jhibberd) Choose better colors.
+            genotype_a = self.join(genotype_a)
+            genotype_b = self.join(genotype_b)
+            genotype_c = self.join(genotype_c)
+   
+            score_diff = self.calc_child_score_diff(score_a, score_b, score_c)
+            score_a = self.markup_score(score_a)
+            score_b = self.markup_score(score_b)
+            score_c = self.markup_score(score_c)
 
             output.append(
                 ((genotype_a, score_a), 
                  (genotype_b, score_b),
-                 (genotype_c, score_c)))
+                 (genotype_c, score_c),
+                 score_diff))
 
         # Display all genotypes in the generation.
         self.render('generation.html', 
@@ -66,30 +71,49 @@ class MainHandler(tornado.web.RequestHandler):
     
     # TODO(jhibberd) Put these functions into separate classes.
 
-    GENE_ANCESTRY_TO_CSS = {
-        GeneAncestry.ParentA:   "gene-type-parent-a",
-        GeneAncestry.ParentB:   "gene-type-parent-b",
-        GeneAncestry.Mutation:  "gene-type-mutation",
+    @staticmethod
+    def calc_child_score_diff(score_a, score_b, score_c):
+        x = min(score_a, score_b) - score_c
+        if x < 0:   html_tag = "evolutionary-regression"
+        elif x > 0: html_tag = "evolutionary-progression"
+        else:       html_tag = "evolutionary-stasis"
+        x = "%.6f" % x
+        return "<{0}>{1}</{0}>".format(html_tag, x)
+
+    @staticmethod
+    def join(genotype):
+        return '&nbsp'.join(genotype)
+
+    GENE_STATE_TO_HTML_TAG = {
+        GeneState.On:       "gene-state-on",
+        GeneState.Off:      "gene-state-off",
+        GeneState.Mutant:   "gene-state-mutant",
         }
     @classmethod
-    def markup_ancestry(cls, genotypes):
-        def f(gene, ancestry):
+    def markup_ancestry(cls, genotype, states):
+        def html(g, s):
             return "<{0}>{1}</{0}>".format(
-                cls.GENE_ANCESTRY_TO_CSS[ancestry], gene)
-        return [f(g, a) for g, a in genotypes]
+                cls.GENE_STATE_TO_HTML_TAG[s], g)
+        return [html(g, s) for g, s in zip(genotype, states)]
 
     @staticmethod
-    def mark_ancestry_all(genotype, ancestry):
-        return map(lambda x: (x, ancestry), genotype)
+    def markup_score(score):
+        return str(score).ljust(14).replace(' ', '&nbsp;')
 
     @staticmethod
-    def mark_ancestry_diff(genotype, parent_a, parent_b):
-        def ancestry(gene, a, b):
-            if gene == a: return GeneAncestry.ParentA
-            if gene == b: return GeneAncestry.ParentB
-            return GeneAncestry.Mutation
-        return [(g, ancestry(g, a, b)) for g, a, b in \
-            zip(genotype, parent_a, parent_b)]
+    def get_states(parent_a, parent_b, child):
+        """TODO(jhibberd) Explain"""
+        def f(a, b, c):
+            a_ = GeneState.On if a == c else GeneState.Off 
+            b_ = GeneState.On if b == c else GeneState.Off 
+            c_ = GeneState.On if c in [a,b] else GeneState.Mutant
+            if a_ == GeneState.On and b_ == GeneState.On:
+                a_, b_ = (
+                    (GeneState.Off, GeneState.On), 
+                    (GeneState.On, GeneState.Off),
+                    )[random.randint(0,1)]
+            return (a_, b_, c_)    
+        return [f(a, b, c) for a,b,c in zip(parent_a, parent_b, child)]
 
     @staticmethod
     def longest_gene(genotypes):
@@ -119,7 +143,7 @@ class MainHandler(tornado.web.RequestHandler):
         d = {}
         for ln in self.open_log('score', generation):
             hash_, score = ln[:-1].split(',')
-            d[hash_] = score
+            d[hash_] = float(score)
         return d
 
     def load_evolution(self, generation):
