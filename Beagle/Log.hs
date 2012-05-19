@@ -8,7 +8,7 @@ module Beagle.Log
     , eval
     , setUp
     , score
-    , breed
+    , evolve
     ) where
 
 import Data.HashTable
@@ -43,10 +43,11 @@ score !gt !s = do
     p <- logPath "score"
     write p (hash gt ++ "," ++ show s)
 
--- | Two genotypes have been bred together.
-breed :: (Show a) => [a] -> [a] -> [a] -> IO ()
-breed !a !b !c = do 
-    p <- logPath "breed"
+-- | Using crossover and mutation two genotypes have been combined to create
+-- a third, new generation, genotype.
+evolve :: (Show a) => [a] -> [a] -> [a] -> IO ()
+evolve !a !b !c = do 
+    p <- logPath "evolve"
     write p (hash a ++ "," ++ hash b ++ "," ++ hash c)
 
 -- | Helpers and constants -----------------------------------------------------

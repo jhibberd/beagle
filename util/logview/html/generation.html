@@ -1,0 +1,38 @@
+<html>
+    <head>
+        <title>Beagle LogView</title>
+        <style>
+            
+            body {
+                font-family: Courier New, Courier New, monospace;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+            
+            gene-type-parent-a {
+                color: Green;
+            }
+
+            gene-type-parent-b {
+                color: Red;
+            }
+
+            gene-type-mutation {
+                color: Blue;
+            }
+
+        </style>
+    </head>
+    <body>
+        <a href="/?generation={{ generation-1 }}">Previous</a>
+        <a href="/?generation={{ generation+1 }}">Next</a>
+        <br />
+        {% for (genotype_a, score_a), \
+               (genotype_b, score_b), \
+               (genotype_c, score_c) in content %}
+            {% raw genotype_a %} {{ score_a }} <br /> 
+            {% raw genotype_b %} {{ score_b }} <br /> 
+            {% raw genotype_c %} {{ score_c }} <br /><br /> 
+        {% end %}
+    </body>
+</html>
