@@ -7,8 +7,16 @@
                 font-family: Courier New, Courier New, monospace;
                 font-size: 13px;
                 white-space: nowrap;
+                margin: 0;
             }
-            
+            .header {
+                background-color: #eee;
+                padding: 5px;
+            }
+            .content {
+                margin: 5px;
+            }
+
             gene-state-on {
                 color: #000;
             }
@@ -19,30 +27,27 @@
                 color: #ff0000;
             }
 
-            evolutionary-regression {
+            evolved-score.regression {
                 color: #ff0000;
             }
-            evolutionary-progression {
+            evolved-score.progression {
                 color: #00ff00;
             }
-            evolutionary-stasis {
+            evolved-score.stasis {
                 color: #bbb;
             }
 
         </style>
     </head>
     <body>
-        <a href="/?generation={{ generation-1 }}">Previous</a>
-        <a href="/?generation={{ generation+1 }}">Next</a>
-        <br />
-        {% for (genotype_a, score_a), \
-               (genotype_b, score_b), \
-               (genotype_c, score_c), \
-               score_diff in content %}
-            {% raw score_a %} {% raw genotype_a %}<br /> 
-            {% raw score_b %} {% raw genotype_b %}<br /> 
-            {% raw score_c %} {% raw genotype_c %}<br />
-            {% raw score_diff %}<br /><br />
-        {% end %}
+        <div class="header">
+            <a href="/?generation={{ generation-1 }}">Previous</a>
+            <a href="/?generation={{ generation+1 }}">Next</a>
+        </div>
+        <div class="content">
+            {% for ln in content %}
+                {% raw ln %}
+            {% end %}
+        </div>
     </body>
 </html>

@@ -210,7 +210,7 @@ playA, playB, playC, playD, playE, playF, playG, playH, playI
 -- next gene if the position is already take - like 'empty'.
 play :: Mark -> Pos -> [Gene] -> Int -> State -> ([Gene], Int, State)
 play m p gs gi (fa, fb, fs, ba, bb, grid) 
-    | grid !! p /= N = (gs, length gs, (fa, fb, fs, ba, bb, grid)) -- skip move
+    | grid !! p /= N = (gs, gi+1, (fa, fb, fs, ba, bb, grid)) -- skip move
     | otherwise = let (x,_:xs) = splitAt p grid 
                   in (gs, length gs, (fa, fb, fs, ba, bb, x++(m:xs)))
 

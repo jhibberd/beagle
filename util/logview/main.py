@@ -2,13 +2,6 @@ import random
 import tornado.ioloop
 import tornado.web
 
-class GeneState(object):
-    """The state (color) used when rendering a gene."""
-    On =        0
-    Off =       1
-    Mutant =    2
-
-
 class MainHandler(tornado.web.RequestHandler):
 
     def get(self):
@@ -16,73 +9,93 @@ class MainHandler(tornado.web.RequestHandler):
         # Get generation.
         generation = int(self.get_argument('generation'))
 
-        # Load log files for current generation into memory.
-        genotypes = self.load_genotypes(generation)
-        scores = self.load_scores(generation)
-        evolution = self.load_evolution(generation)
+        # Load relevant log files into memory to produce stats on requested
+        # generation.
+        genotypes =         LogLoader.load_genotypes(generation)
+        scores =            LogLoader.load_scores(generation)
+        evolution =         LogLoader.load_evolution(generation)
+        genotypes_next =    LogLoader.load_genotypes(generation+1)
+        scores_next =       LogLoader.load_scores(generation+1)
 
-        # Load log files for next generation into memory.
-        genotypes_next = self.load_genotypes(generation+1)
-        scores_next = self.load_scores(generation+1)
-
-        # Processing...
-        output = []
-        lookup = lambda hash_: (genotypes[hash_], scores[hash_])
-        lookup_next = lambda hash_: (genotypes_next[hash_], scores_next[hash_])
+        # Process the log data into a list of detailed evolutionary events.
+        events = []
         for a, b, c in evolution:
 
-            genotype_a, score_a = lookup(a)
-            genotype_b, score_b = lookup(b)
-            genotype_c, score_c = lookup_next(c)
+            genotype_a, score_a = (genotypes[a],        scores[a])
+            genotype_b, score_b = (genotypes[b],        scores[b])
+            genotype_c, score_c = (genotypes_next[c],   scores_next[c])
 
-            states = self.get_states(genotype_a, genotype_b, genotype_c)
-            states_a, states_b, states_c = zip(*states)
+            states_a, states_b, states_c =\
+                LogProcessor.get_states(genotype_a, genotype_b, genotype_c)
+            score_diff = LogProcessor.get_score_diff(score_a, score_b, score_c)
 
-            longest_gene = self.longest_gene([
-                genotype_a, genotype_b, genotype_c])
-            genotype_a = self.pad_genes(longest_gene, genotype_a)
-            genotype_b = self.pad_genes(longest_gene, genotype_b)
-            genotype_c = self.pad_genes(longest_gene, genotype_c)
+            events.append((
+                (genotype_a, states_a, score_a),
+                (genotype_b, states_b, score_b),
+                (genotype_c, states_c, score_c),
+                score_diff,
+                ))
 
-            genotype_a = self.markup_ancestry(genotype_a, states_a) 
-            genotype_b = self.markup_ancestry(genotype_b, states_b) 
-            genotype_c = self.markup_ancestry(genotype_c, states_c) 
-
-            genotype_a = self.join(genotype_a)
-            genotype_b = self.join(genotype_b)
-            genotype_c = self.join(genotype_c)
-   
-            score_diff = self.calc_child_score_diff(score_a, score_b, score_c)
-            score_a = self.markup_score(score_a)
-            score_b = self.markup_score(score_b)
-            score_c = self.markup_score(score_c)
-
-            output.append(
-                ((genotype_a, score_a), 
-                 (genotype_b, score_b),
-                 (genotype_c, score_c),
-                 score_diff))
-
-        # Display all genotypes in the generation.
+        # Format the processed log data for HTML rendering, then render.
+        content = LogFormatter.fmt(events)
         self.render('generation.html', 
-            content=output,
+            content=content,
             generation=generation,
             )
     
-    # TODO(jhibberd) Put these functions into separate classes.
+
+class GeneState(object):
+    """The state (color) used when rendering a gene."""
+    On =        0
+    Off =       1
+    Mutant =    2
+
+
+class LogFormatter(object):
+    """Format processed log data for HTML rendering."""
+
+    @classmethod
+    def fmt(cls, events):
+        return [cls._fmt_event(*x) for x in events]
+
+    @classmethod
+    def _fmt_event(cls, parent_a, parent_b, child, score_diff):
+
+        # Unpack arguments. 
+        genotype_a, states_a, score_a = parent_a
+        genotype_b, states_b, score_b = parent_b
+        genotype_c, states_c, score_c = child
+
+        # Convert the processed data to lines of HTML.
+        longest_gene = cls._longest_gene(genotype_a, genotype_b, genotype_c)
+
+        def to_line(genotype, states, score):
+            genotype = cls._pad_genes(genotype, width=longest_gene)
+            genotype = cls._add_state_tag(genotype, states)
+            genotype = cls._join_genotype(genotype)
+            score = cls._pad_score(score)
+            return cls._combine_genotype_and_score(genotype, score)
+
+        line_a = to_line(genotype_a, states_a, score_a)
+        line_b = to_line(genotype_b, states_b, score_b)
+        line_c = to_line(genotype_c, states_c, score_c)
+        line_d = cls._fmt_score_diff(score_diff)
+
+        return cls._combine_lines(line_a, line_b, line_c, line_d)
 
     @staticmethod
-    def calc_child_score_diff(score_a, score_b, score_c):
-        x = min(score_a, score_b) - score_c
-        if x < 0:   html_tag = "evolutionary-regression"
-        elif x > 0: html_tag = "evolutionary-progression"
-        else:       html_tag = "evolutionary-stasis"
-        x = "%.6f" % x
-        return "<{0}>{1}</{0}>".format(html_tag, x)
+    def _longest_gene(*genotypes):
+        """Return the length (in chars) of the longest gene in a list of
+        genotypes.
+        """
+        return max([max(map(len, g)) for g in genotypes])
 
     @staticmethod
-    def join(genotype):
-        return '&nbsp'.join(genotype)
+    def _pad_genes(genotype, width):
+        """Ensure all genes are rendered using the same number of chars so that
+        gene 'columns' align.
+        """
+        return [g.ljust(width).replace(' ', '&nbsp;') for g in genotype]
 
     GENE_STATE_TO_HTML_TAG = {
         GeneState.On:       "gene-state-on",
@@ -90,19 +103,63 @@ class MainHandler(tornado.web.RequestHandler):
         GeneState.Mutant:   "gene-state-mutant",
         }
     @classmethod
-    def markup_ancestry(cls, genotype, states):
-        def html(g, s):
+    def _add_state_tag(cls, genotype, states):
+        """Wrap each gene in its assigned state html tag."""
+        def f(g, s):
             return "<{0}>{1}</{0}>".format(
                 cls.GENE_STATE_TO_HTML_TAG[s], g)
-        return [html(g, s) for g, s in zip(genotype, states)]
+        return [f(g, s) for g, s in zip(genotype, states)]
 
     @staticmethod
-    def markup_score(score):
-        return str(score).ljust(14).replace(' ', '&nbsp;')
+    def _join_genotype(genotype):
+        """Join list of genes (genotype) into a single HTML string."""
+        return '&nbsp'.join(genotype)
+
+    SCORE_WIDTH = 14 # chars
+    @classmethod
+    def _pad_score(cls, s):
+        """Ensure all scores are rendered using the same number of chars so 
+        that score 'columns' align.
+        """
+        return str(s).ljust(cls.SCORE_WIDTH).replace(' ', '&nbsp;')
+
+    @staticmethod
+    def _combine_genotype_and_score(genotype, score):
+        """Combine a formatted genotype and its associated score to a single
+        HTML line.
+        """
+        return score + genotype
+
+    @staticmethod
+    def _combine_lines(*lines):
+        """Combine all the formatted lines of an event into a single line of
+        HTML.
+        """
+        return "<br />".join(lines) + "<br /><br />"
+
+    @staticmethod
+    def _fmt_score_diff(score_diff):
+        if score_diff < 0:      css_class = "regression"
+        elif score_diff > 0:    css_class = "progression"
+        else:                   css_class = "stasis"
+        score_diff = "%.6f" % score_diff # To 6 decimal places
+        return "<evolved-score class='{0}'>{1}</evolved-score>".\
+            format(css_class, score_diff)
+
+
+class LogProcessor(object):
+    """Calculate data derived from log data."""
 
     @staticmethod
     def get_states(parent_a, parent_b, child):
-        """TODO(jhibberd) Explain"""
+        """Returns a list of tuples representing the gene states for the parent
+        and child genotypes.
+        
+        Returns:
+            ((state_of_parent_a_gene_0, state_of_parent_a_gene_1, ...), 
+             (state_of_parent_b_gene_0, state_of_parent_b_gene_1, ...),
+             (state_of_child_gene_0, state_of_child_gene_1, ...))
+        """
         def f(a, b, c):
             a_ = GeneState.On if a == c else GeneState.Off 
             b_ = GeneState.On if b == c else GeneState.Off 
@@ -113,51 +170,64 @@ class MainHandler(tornado.web.RequestHandler):
                     (GeneState.On, GeneState.Off),
                     )[random.randint(0,1)]
             return (a_, b_, c_)    
-        return [f(a, b, c) for a,b,c in zip(parent_a, parent_b, child)]
+        return zip(*[f(a, b, c) for a,b,c in zip(parent_a, parent_b, child)])
 
     @staticmethod
-    def longest_gene(genotypes):
-        return max([max(map(len, g)) for g in genotypes])
+    def get_score_diff(score_a, score_b, score_c):
+        """Return the difference between the best parent score and the evolved
+        child's score.
 
-    @staticmethod
-    def pad_genes(longest_gene, genotype):
-        return [g.ljust(longest_gene).replace(' ', '&nbsp;') for g in genotype]
-
-    def load_genotypes(self, generation):
+        A negative number indicates an evolutionary regression, where the child
+        performed more poorly than the best parent.
         """
+        return min(score_a, score_b) - score_c
+
+
+class LogLoader(object):
+    """Parse log files and load into memory."""
+
+    @classmethod
+    def load_genotypes(cls, generation):
+        """Load human-friendly genotype strings and their associated hashes.
+
         Format:
             hash,genotype
         """
         d = {}
-        for ln in self.open_log('genotype', generation):
+        for ln in cls._open_log('genotype', generation):
             hash_, genotype = ln[:-1].split(',', 1)
             genotype = genotype[1:-1].split(',')
             d[hash_] = genotype
         return d 
 
-    def load_scores(self, generation):
-        """
+    @classmethod
+    def load_scores(cls, generation):
+        """Load scores achieved by each genotype.
+
         Format:
             hash,score
         """
         d = {}
-        for ln in self.open_log('score', generation):
+        for ln in cls._open_log('score', generation):
             hash_, score = ln[:-1].split(',')
             d[hash_] = float(score)
         return d
 
-    def load_evolution(self, generation):
-        """
+    @classmethod
+    def load_evolution(cls, generation):
+        """Load genotype crossover data.
+
         Format:
             parent_a_hash,parent_b_hash,child_hash
         """
         xs = []
-        for ln in self.open_log('evolve', generation):
+        for ln in cls._open_log('evolve', generation):
             triple = ln[:-1].split(',')
             xs.append(triple)
         return xs
 
-    def open_log(self, file_type, generation):
+    @staticmethod
+    def _open_log(file_type, generation):
         """Syntactic shortcut for getting handle to log file."""
         return open('/tmp/beagle/%s.%s' % (generation, file_type))
 
