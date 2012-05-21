@@ -96,5 +96,6 @@ solve !p !g !gen !hist = do
 
 main = do 
     Log.setUp
-    solve popSeed R.g 1 []
+    g <- solve popSeed R.g 1 []
+    print g
 
