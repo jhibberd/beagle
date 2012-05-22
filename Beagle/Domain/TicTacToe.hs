@@ -351,8 +351,8 @@ score :: [Gene] -> IO Float
 score gs = do
         realScore <- runner'' gs numGames g OTurn
         return $ toScore realScore
-    where g = mkStdGen 6
-          numGames = 2
+    where g = mkStdGen 12
+          numGames = 100
 
 runner'' :: (RandomGen g) 
          => [Gene] 
