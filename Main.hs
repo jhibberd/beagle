@@ -49,17 +49,17 @@ modeAvg (x:xs) m = modeAvg xs (Map.insert x (getFreq x +1) m)
 
 
 addToHist :: (a, Int) -> [(a, Int)] -> [(a, Int)]
-addToHist x xs = take 20 (x:xs)
+addToHist x xs = take 80 (x:xs)
 
 isLocalOptima :: [(Float, Int)] -> Bool
 isLocalOptima xs
-    | length xs < 10 = False
+    | length xs < 80 = False
     | otherwise = case all stalePop xs of
                       True -> trace (show "LO! " ++ show xs) True
                       False -> False
 
 stalePop :: (Float, Int) -> Bool
-stalePop (a, n) = n > 70 && a < 0.99
+stalePop (a, n) = n > 270 && a < 0.99
 
 -- END
 

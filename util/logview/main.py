@@ -14,28 +14,28 @@ class MainHandler(tornado.web.RequestHandler):
         genotypes =         LogLoader.load_genotypes(generation)
         scores =            LogLoader.load_scores(generation)
         evolution =         LogLoader.load_evolution(generation)
-        evals =             LogLoader.load_evals(generation)
+        msgs =              LogLoader.load_msgs(generation)
         genotypes_next =    LogLoader.load_genotypes(generation+1)
         scores_next =       LogLoader.load_scores(generation+1)
-        evals_next =        LogLoader.load_evals(generation+1)
+        msgs_next =         LogLoader.load_msgs(generation+1)
 
         # Process the log data into a list of detailed evolutionary events.
         events = []
         for a, b, c in evolution:
 
-            genotype_a, score_a, evals_a = (genotypes[a], scores[a], evals[a])
-            genotype_b, score_b, evals_b = (genotypes[b], scores[b], evals[b])
-            genotype_c, score_c, evals_c =\
-                (genotypes_next[c], scores_next[c], evals_next[c])
+            genotype_a, score_a, msgs_a = (genotypes[a], scores[a], msgs[a])
+            genotype_b, score_b, msgs_b = (genotypes[b], scores[b], msgs[b])
+            genotype_c, score_c, msgs_c =\
+                (genotypes_next[c], scores_next[c], msgs_next[c])
 
             states_a, states_b, states_c =\
                 LogProcessor.get_states(genotype_a, genotype_b, genotype_c)
             score_diff = LogProcessor.get_score_diff(score_a, score_b, score_c)
 
             events.append((
-                (genotype_a, states_a, score_a, evals_a),
-                (genotype_b, states_b, score_b, evals_b),
-                (genotype_c, states_c, score_c, evals_c),
+                (genotype_a, states_a, score_a, msgs_a),
+                (genotype_b, states_b, score_b, msgs_b),
+                (genotype_c, states_c, score_c, msgs_c),
                 score_diff,
                 ))
 
@@ -65,24 +65,24 @@ class LogFormatter(object):
     def _fmt_event(cls, parent_a, parent_b, child, score_diff):
 
         # Unpack arguments. 
-        genotype_a, states_a, score_a, evals_a = parent_a
-        genotype_b, states_b, score_b, evals_b = parent_b
-        genotype_c, states_c, score_c, evals_c = child
+        genotype_a, states_a, score_a, msgs_a = parent_a
+        genotype_b, states_b, score_b, msgs_b = parent_b
+        genotype_c, states_c, score_c, msgs_c = child
 
         # Convert the processed data to lines of HTML.
         longest_gene = cls._longest_gene(genotype_a, genotype_b, genotype_c)
 
-        def to_line(genotype, states, score, evals):
+        def to_line(genotype, states, score, msgs):
             genotype = cls._pad_genes(genotype, width=longest_gene)
             genotype = cls._add_state_tag(genotype, states)
             genotype = cls._join_genotype(genotype)
-            evals = cls._fmt_evals(evals)
+            msgs = cls._fmt_msgs(msgs)
             score = cls._pad_score(score)
-            return cls._combine_all(genotype, score, evals)
+            return cls._combine_all(genotype, score, msgs)
 
-        line_a = to_line(genotype_a, states_a, score_a, evals_a)
-        line_b = to_line(genotype_b, states_b, score_b, evals_b)
-        line_c = to_line(genotype_c, states_c, score_c, evals_c)
+        line_a = to_line(genotype_a, states_a, score_a, msgs_a)
+        line_b = to_line(genotype_b, states_b, score_b, msgs_b)
+        line_c = to_line(genotype_c, states_c, score_c, msgs_c)
         line_d = cls._fmt_score_diff(score_diff)
 
         return cls._combine_lines(line_a, line_b, line_c, line_d)
@@ -128,17 +128,17 @@ class LogFormatter(object):
         return str(s).ljust(cls.SCORE_WIDTH).replace(' ', '&nbsp;')
 
     @staticmethod
-    def _fmt_evals(evals):
+    def _fmt_msgs(msgs):
         """Format all genotype evaluations as an HTML list."""
-        return "<ul class='evals'>" +\
-            ''.join(["<li>%s</li>" % e for e in evals]) + "</ul>"
+        return "<ul class='msgs'>" + \
+            ''.join(["<li>%s</li>" % x for x in msgs]) + "</ul>"
 
     @staticmethod
-    def _combine_all(genotype, score, evals):
-        """Combine a formatted genotype, all its evaluations and its associated 
+    def _combine_all(genotype, score, msgs):
+        """Combine a formatted genotype, all its messages and its associated 
         score to a single HTML line.
         """
-        return score + genotype + evals
+        return score + genotype + msgs
 
     @staticmethod
     def _combine_lines(*lines):
@@ -237,16 +237,16 @@ class LogLoader(object):
         return xs
 
     @classmethod
-    def load_evals(cls, generation):
-        """Load the final state following a genotype evaluation.
+    def load_msgs(cls, generation):
+        """Load the arbitrary messages logged for each genotype.
 
         Format:
-            hash,final_state
+            hash,msg
         """
         d = {}
-        for ln in cls._open_log('eval', generation):
-            hash_, final_state = ln[:-1].split(',', 1)
-            d.setdefault(hash_, []).append(final_state)
+        for ln in cls._open_log('msg', generation):
+            hash_, msg = ln[:-1].split('|')
+            d.setdefault(hash_, []).append(msg)
         return d
 
     @staticmethod

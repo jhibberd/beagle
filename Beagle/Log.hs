@@ -5,7 +5,7 @@
 
 module Beagle.Log
     ( generation
-    , eval
+    , msg
     , setUp
     , score
     , evolve
@@ -30,10 +30,10 @@ maybeCropLogs = do
         when (t > 0) $ deleteLogs t
     where deleteLogs t = do
               removeFile $ logPath' t "genotype" 
-              removeFile $ logPath' t "eval" 
+              removeFile $ logPath' t "msg" 
               removeFile $ logPath' t "score" 
               removeFile $ logPath' t "evolve" 
-          threshold = 20
+          threshold = 50
 
 -- | A new generation has begun.
 -- Increment the generation count and log all the genotypes (against their
@@ -47,11 +47,11 @@ generation !gen ps = do
         return ()
     where writeGenotype p gt = write p (hash gt ++ "," ++ show gt)
 
--- | A genotype has been evaluated.
-eval :: (Show a, Show b) => [a] -> b -> IO ()
-eval !gt !s = do
-    p <- logPath "eval"
-    write p (hash gt ++ "," ++ show s)
+-- | Arbitrary message about a specific genotype.
+msg :: Show a => [a] -> String -> IO ()
+msg !gt !msg = do
+    p <- logPath "msg"
+    write p (hash gt ++ "|" ++ msg)
 
 -- | A genotype has been scored.
 score :: (Show a) => [a] -> Float -> IO ()
