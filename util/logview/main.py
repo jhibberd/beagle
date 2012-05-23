@@ -8,16 +8,21 @@ class MainHandler(tornado.web.RequestHandler):
 
         # Get generation.
         generation = int(self.get_argument('generation'))
+        sample_size = int(self.get_argument('sample_size', 10))
 
         # Load relevant log files into memory to produce stats on requested
         # generation.
-        genotypes =         LogLoader.load_genotypes(generation)
-        scores =            LogLoader.load_scores(generation)
-        evolution =         LogLoader.load_evolution(generation)
-        msgs =              LogLoader.load_msgs(generation)
-        genotypes_next =    LogLoader.load_genotypes(generation+1)
-        scores_next =       LogLoader.load_scores(generation+1)
-        msgs_next =         LogLoader.load_msgs(generation+1)
+        evolution =         LogLoader.load_evolution(generation, sample_size)
+        parent_hashes, child_hashes =\
+            LogProcessor.extract_hashes_from_evolution(evolution)
+
+        genotypes =         LogLoader.load_genotypes(generation, parent_hashes)
+        scores =            LogLoader.load_scores(generation, parent_hashes)
+        msgs =              LogLoader.load_msgs(generation, parent_hashes)
+
+        genotypes_next =    LogLoader.load_genotypes(generation+1, child_hashes)
+        scores_next =       LogLoader.load_scores(generation+1, child_hashes)
+        msgs_next =         LogLoader.load_msgs(generation+1, child_hashes)
 
         # Process the log data into a list of detailed evolutionary events.
         events = []
@@ -192,13 +197,25 @@ class LogProcessor(object):
         """
         return min(score_a, score_b) - score_c
 
+    @staticmethod
+    def extract_hashes_from_evolution(evolution):
+        """Return a list of parent and child hashes occuring in an evolution
+        sample.
+        """
+        ps = []; cs = []
+        for p1, p2, c in evolution:
+            ps.extend([p1, p2])
+            cs.append(c)
+        return ps, cs
+
 
 class LogLoader(object):
     """Parse log files and load into memory."""
 
     @classmethod
-    def load_genotypes(cls, generation):
-        """Load human-friendly genotype strings and their associated hashes.
+    def load_genotypes(cls, generation, hashes):
+        """Load genotypes and their associated hashes but only is their hashes
+        appear in an approved list.
 
         Format:
             hash,genotype
@@ -206,12 +223,13 @@ class LogLoader(object):
         d = {}
         for ln in cls._open_log('genotype', generation):
             hash_, genotype = ln[:-1].split(',', 1)
+            if hash_ not in hashes: continue
             genotype = genotype[1:-1].split(',')
             d[hash_] = genotype
         return d 
 
     @classmethod
-    def load_scores(cls, generation):
+    def load_scores(cls, generation, hashes):
         """Load scores achieved by each genotype.
 
         Format:
@@ -220,24 +238,28 @@ class LogLoader(object):
         d = {}
         for ln in cls._open_log('score', generation):
             hash_, score = ln[:-1].split(',')
+            if hash_ not in hashes: continue
             d[hash_] = float(score)
         return d
 
     @classmethod
-    def load_evolution(cls, generation):
-        """Load genotype crossover data.
+    def load_evolution(cls, generation, sample_size):
+        """Load genotype crossover data but limited to 'sample_size' randomly
+        chosen entries.
 
         Format:
             parent_a_hash,parent_b_hash,child_hash
         """
+        with cls._open_log('evolve', generation) as f:
+            lns = f.readlines()
         xs = []
-        for ln in cls._open_log('evolve', generation):
+        for ln in random.sample(lns, sample_size):
             triple = ln[:-1].split(',')
             xs.append(triple)
         return xs
 
     @classmethod
-    def load_msgs(cls, generation):
+    def load_msgs(cls, generation, hashes):
         """Load the arbitrary messages logged for each genotype.
 
         Format:
@@ -246,6 +268,7 @@ class LogLoader(object):
         d = {}
         for ln in cls._open_log('msg', generation):
             hash_, msg = ln[:-1].split('|')
+            if hash_ not in hashes: continue
             d.setdefault(hash_, []).append(msg)
         return d
 
