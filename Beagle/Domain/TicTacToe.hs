@@ -21,14 +21,15 @@ module Beagle.Domain
     ) where
 
 import Beagle.Eval
+import qualified Beagle.Log as Log
 import qualified Data.Map as Map
 import Debug.Trace
 import System.IO.Unsafe
 import System.Random
 
-genotypeLength =        30
-populationSize =        10     :: Int
-randomSeed =            6      :: Int
+genotypeLength =        500
+populationSize =        300    :: Int
+randomSeed =            12     :: Int
 
 
 data Gene = PlayA | PlayB | PlayC | PlayD | PlayE | PlayF | PlayG | PlayH
@@ -205,9 +206,12 @@ type State =
 playA, playB, playC, playD, playE, playF, playG, playH, playI 
     :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
+-- TODO(jhibberd) All it takes is one of these for a position that is already
+-- taken and that essentially junks the genotype. Instead try skipping to the
+-- next gene if the position is already take - like 'empty'.
 play :: Mark -> Pos -> [Gene] -> Int -> State -> ([Gene], Int, State)
 play m p gs gi (fa, fb, fs, ba, bb, grid) 
-    | grid !! p /= N = (gs, length gs, (fa, fb, fs, ba, bb, grid)) -- skip move
+    | grid !! p /= N = (gs, gi+1, (fa, fb, fs, ba, bb, grid)) -- skip move
     | otherwise = let (x,_:xs) = splitAt p grid 
                   in (gs, length gs, (fa, fb, fs, ba, bb, x++(m:xs)))
 
@@ -343,54 +347,66 @@ hostPlay grid g = let (i, g') = randomR (0, (length freeonly)-1) g
 toScore :: [Int] -> Float
 toScore xs = 1 - (1 / (fromIntegral $ (sum xs +1))) 
 
--- TODO(jhibberd) Cleanup (and abstract?) local optima work.
--- TODO(jhibberd) Calculate num. mutations per genotype at 5% rate
---                Time with and w/0 to ensure correct implementation.
-
-score :: [Gene] -> Float
-score gs = toScore $ runner'' gs numGames g OTurn
-    where g = mkStdGen 6
-          numGames = 2
+score :: [Gene] -> IO Float
+score gs = do
+        realScore <- runner'' gs numGames g OTurn
+        return $ toScore realScore
+    where g = mkStdGen 12
+          numGames = 100
 
 runner'' :: (RandomGen g) 
          => [Gene] 
          -> Int 
          -> g 
          -> Turn 
-         -> [Int]
-runner'' _ 0 _ _ = []
-runner'' gs n g t = let (outcome, g') = playGame gs newGrid g 0 t 
-                    in outcome: runner'' gs (n-1) g' nextT
+         -> IO [Int]
+runner'' _ 0 _ _ = return []
+runner'' gs n g t = do
+        (outcome, g') <- playGame gs newGrid g 0 t
+        outcome' <- runner'' gs (n-1) g' nextT
+        return (outcome:outcome')
     where newGrid = toState (replicate 9 N)
           nextT = case t of
                       XTurn -> OTurn
                       OTurn -> XTurn
 
--- TODO(jhibberd) Should probably be win=3, draw=1, loss=0
 playGame :: (RandomGen g) 
          => [Gene] 
          -> State 
          -> g
          -> Int -- Number of turns taken
          -> Turn 
-         -> (Int, g)
+         -> IO (Int, g)
 playGame gs (_, _, _, _, _, grid) g nt t =
-    case getState (traceShow grid grid) of
+    case getState grid of
         Open -> case t of
-                    XTurn -> let (b', g') = hostPlay grid g
-                             in playGame gs (toState b') g' (nt+1) OTurn
-                    OTurn -> let s = eval gs gmap 0 $ toState grid
-                             in case didMoveCorrectly s (nt+1) of
-                                    False -> (25-nt, g)
-                                    True -> playGame gs s g (nt+1) XTurn
-        XWins -> (10, g)
-        OWins -> (0, g)
-        Draw -> (5, g)
+
+                    XTurn -> do
+                        let (b', g') = hostPlay grid g
+                        Log.msg gs ("H " ++ show grid ++ " -> " ++ show b')
+                        playGame gs (toState b') g' (nt+1) OTurn
+
+                    OTurn -> do
+                        s <- eval gs gmap 0 (toState grid)
+                        if didMoveCorrectly s (nt+1)
+                            then do
+                                let s' = show $ fromState s
+                                Log.msg gs ("F " ++ show grid ++ " -> " ++ s')
+                                playGame gs s g (nt+1) XTurn
+                            else do 
+                                Log.msg gs ("BAD_MOVE at " ++ show nt)
+                                return (25-nt, g)
+
+        XWins ->    do { Log.msg gs "- X_WIN"; return (10, g) }
+        OWins ->    do { Log.msg gs "+ O_WIN"; return (0, g) }
+        Draw ->     do { Log.msg gs "+ DRAW"; return (0, g) }
 
 didMoveCorrectly :: State -> Int -> Bool
 didMoveCorrectly (_, _, _, _, _, grid) numTurns = (length $ filter (/=N) grid) == numTurns 
 
 -- | Manual testing of the runner ----------------------------------------------
 
-main = print $ score [APlayA, FlagSwitch, IsAN, FlagTrue, PlayB]
+main = do
+    s <- score [APlayA, FlagSwitch, IsAN, FlagTrue, PlayB]
+    print s
 
