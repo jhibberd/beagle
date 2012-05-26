@@ -2,10 +2,11 @@ module Beagle.Eval
     ( eval
     ) where
 
-import qualified Beagle.Log as Log
 import qualified Data.Map as Map
 
 -- | Runs an initial state through a gene sequence and returns the final state.
+--
+-- Applies input x to hypothesis h and returns y.
 --
 -- The state (s) and gene (g) data types are defined in the domain module.
 eval :: (Ord g, Show s, Show g)
@@ -15,10 +16,10 @@ eval :: (Ord g, Show s, Show g)
      -- Index (within the gene sequence) of the current gene being applied to
      -- the state.
      -> Int 
-     -> s -- Initial (or current, during recursive calls) state
+     -> s -- Initial (or current, if recursive) state
      -> IO s -- Final state 
 eval gs gmap i s 
-    | i >= length gs = do { Log.eval gs s; return s }
+    | i >= length gs = return s
     | otherwise = let (gs', i', s') = f gs i s
                   in eval gs' gmap i' s'
         where f = (Map.!) gmap (gs !! i)

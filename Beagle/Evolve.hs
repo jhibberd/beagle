@@ -30,8 +30,11 @@ evolve g ps = f D.populationSize g
               return (x:xs, g'')
           make g = do
               let (a:b:[], g') = pair g -- pick pair to breed
-              (x, g'') <- breed a b g'
-              return (mutate x g'') -- mutate n genes to maintain variance
+                  (c, g'') = breed a b g'
+                  -- mutate genes to avoid unhealthy gene pool convergence
+                  (c', g''') = (mutate c g'')
+              Log.evolve a b c'
+              return (c', g''')
           mset = multiset . nub . map fst $ ps
           pair g
               | length mset > 1 = R.pick mset 2 g
@@ -58,11 +61,8 @@ mutate gt g = R.map (\_ g -> R.gene g) gt numMutations g
 -- =>
 -- [x, y, x, x, y, y]
 -- 
-breed :: RandomGen g => Genotype -> Genotype -> g -> IO (Genotype, g)
-breed a b g = do
-        let (c, g') = f (zip a b) g
-        Log.breed a b c
-        return (c, g')
+breed :: RandomGen g => Genotype -> Genotype -> g -> (Genotype, g)
+breed a b g = f (zip a b) g
     where f [] g = ([], g)
           f ((a, b):xs) g = let (switch, g') = randomR (True, False) g
                                 (xs', g'') = f xs g'
