@@ -6,6 +6,8 @@ import qualified Data.Map as Map
 
 -- | Runs an initial state through a gene sequence and returns the final state.
 --
+-- Applies input x to hypothesis h and returns y.
+--
 -- The state (s) and gene (g) data types are defined in the domain module.
 eval :: (Ord g, Show s, Show g)
      => [g] -- Gene sequence 
