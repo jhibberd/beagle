@@ -3,6 +3,8 @@
 
 module Beagle.Evolve
     ( evolve
+    , tournamentSelection -- private
+    , crossover -- private
     ) where
 
 import qualified Beagle.Domain as D
@@ -29,16 +31,34 @@ evolve g ps = f D.populationSize g
               (xs, g'') <- f (n-1) g'
               return (x:xs, g'')
           make g = do
-              let (a:b:[], g') = pair g -- pick pair to breed
-                  (c, g'') = breed a b g'
+              let (parentA, g') =   tournamentSelection ps 10 g
+                  (parentB, g'') =  tournamentSelection ps 10 g'
+                  (child, g''') =   crossover parentA parentB 30 g''
+                  (child', g'''') = mutate child g'''
+              -- # let (a:b:[], g') = pair g -- pick pair to breed
+                  -- #(c, g'') = breed a b g'
                   -- mutate genes to avoid unhealthy gene pool convergence
-                  (c', g''') = (mutate c g'')
-              Log.evolve a b c'
-              return (c', g''')
-          mset = multiset . nub . map fst $ ps
-          pair g
-              | length mset > 1 = R.pick mset 2 g
-              | otherwise = (mset++mset, g)
+                  -- # (c', g''') = (mutate c g'')
+              Log.evolve parentA parentB child'
+              return (child', g'''')
+          -- # mset = multiset . nub . map fst $ ps
+          -- #pair g
+          -- #    | length mset > 1 = R.pick mset 2 g
+          -- #    | otherwise = (mset++mset, g)
+
+-- | Pick an individual from a population by first picking a sample of size 'n'
+-- then selecting the individual from the sample with the best fitness.
+-- 
+-- If the tournament size is large, weak individuals have a smaller chance of
+-- being selected.
+tournamentSelection :: RandomGen g => [(a, Float)] -> Int -> g -> (a, g)
+tournamentSelection ps n g = let (sample, g') = R.pick ps n g
+                                 p = fst . head $ sortSnd sample
+                             in (p, g')
+
+sortSnd :: Ord b => [(a, b)] -> [(a, b)]
+sortSnd = sortBy (\a b -> compare (snd a) (snd b))
+
 
 -- | Mutate n randomly chosen genes of a genotype to prevent the population
 -- from iteratively converging around a small subset of all available genes.
@@ -51,34 +71,35 @@ mutate gt g = R.map (\_ g -> R.gene g) gt numMutations g
     where numMutations = ceiling $ (fromInteger D.genotypeLength) * mutationRate
           mutationRate = 0.01
 
--- | Breed two genotypes by creating a new genotype consisting of randonly
--- selected genes from both parents. An equal number of genes will be picked 
--- from each parent. The gene ordinal positions within the genotype do not
--- change.
---
--- [x, x, x, x, x, x]
--- [y, y, y, y, y, y]
--- =>
--- [x, y, x, x, y, y]
--- 
-breed :: RandomGen g => Genotype -> Genotype -> g -> (Genotype, g)
-breed a b g = f (zip a b) g
-    where f [] g = ([], g)
-          f ((a, b):xs) g = let (switch, g') = randomR (True, False) g
-                                (xs', g'') = f xs g'
-                                !x' = case switch of
-                                    True -> a
-                                    False -> b
-                            in (x':xs', g'')   
 
--- | Return multiset of population genotypes where the genotype multiplicity
--- indicates the genotype "success" (in exhibiting the target phenotype). The
--- multiset will be used to pick pairs to breed; the higher the multiplicity
--- the higher the probability of being picked for breeding.
---
--- TODO(jhibberd) Weighting might be better there than linear.
-multiset :: Population -> [Genotype]
-multiset = f . zip [1..] . reverse 
-    where f [] = []
-          f ((i, x):xs) = replicate i x ++ f xs
+-- | TODO(jhibberd) Pick n random points in the chromosome, for the child use
+-- all contiguous genes up to random point 1 from parent A the all contiguous
+-- blocks from parentB up to point 2 etc. Which parent starts should be random
+
+crossover :: RandomGen g => [a] -> [a] -> Int -> g -> ([a], g)
+crossover pa pb n g = let (startParent, g') = getStartParent
+                          (pts, g'') = points g'
+                          child = crossover' pa pb 0 pts startParent
+                    in (child, g'')
+    where points g = let (sample, g') = R.pick [0 .. (length pa -1)] n g
+                     in (sort sample, g')
+          getStartParent = randomR (False, True) g
+
+crossover' :: [a] -> [a] -> Int -> [Int] -> Bool -> [a]
+crossover' pa pb i is flag
+    | i == length pa = []
+    | otherwise = let c =            parallelGet pa pb i flag
+                      (flag', is') = maybeSwitchFlag flag i is
+                  in c : crossover' pa pb (i+1) is' flag'
+
+maybeSwitchFlag :: Bool -> Int -> [Int] -> (Bool, [Int])
+maybeSwitchFlag flag _ [] = (flag, [])
+maybeSwitchFlag flag i is@(i':is')
+    | i == i' = (not flag, is')
+    | otherwise = (flag, is)
+
+parallelGet :: [a] -> [a] -> Int -> Bool -> a
+parallelGet as bs i flag
+    | flag == True = as !! i
+    | flag == False = bs !! i
 
