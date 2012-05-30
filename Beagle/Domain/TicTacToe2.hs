@@ -36,8 +36,21 @@ data Gene = PlayA | PlayB | PlayC | PlayD | PlayE | PlayF | PlayG | PlayH
           | PlayI | IsAX | IsBX | IsCX | IsDX | IsEX | IsFX | IsGX | IsHX 
           | IsIX | IsAO | IsBO | IsCO | IsDO | IsEO | IsFO | IsGO | IsHO
           | IsIO | IsAN | IsBN | IsCN | IsDN | IsEN | IsFN | IsGN | IsHN
-          | IsIN | JumpUnlessFlagTrue | JumpUnlessFlagFalse | JumpUnlessFlagAnd 
-          | JumpUnlessFlagOr | JumpHere | FlagSwitch | Empty
+          | IsIN | FlagTrue | FlagFalse | FlagAnd | FlagOr | FlagSwitch | Empty
+
+
+          | APlayA | APlayB | APlayC | APlayD | APlayE | APlayF | APlayG | APlayH
+          | APlayI | AIsAX | AIsBX | AIsCX | AIsDX | AIsEX | AIsFX | AIsGX | AIsHX 
+          | AIsIX | AIsAO | AIsBO | AIsCO | AIsDO | AIsEO | AIsFO | AIsGO | AIsHO
+          | AIsIO | AIsAN | AIsBN | AIsCN | AIsDN | AIsEN | AIsFN | AIsGN | AIsHN
+          | AIsIN | AFlagTrue | AFlagFalse | AFlagAnd | AFlagOr | AFlagSwitch | AEmpty
+
+          | BPlayA | BPlayB | BPlayC | BPlayD | BPlayE | BPlayF | BPlayG | BPlayH
+          | BPlayI | BIsAX | BIsBX | BIsCX | BIsDX | BIsEX | BIsFX | BIsGX | BIsHX 
+          | BIsIX | BIsAO | BIsBO | BIsCO | BIsDO | BIsEO | BIsFO | BIsGO | BIsHO
+          | BIsIO | BIsAN | BIsBN | BIsCN | BIsDN | BIsEN | BIsFN | BIsGN | BIsHN
+          | BIsIN | BFlagTrue | BFlagFalse | BFlagAnd | BFlagOr | BFlagSwitch | BEmpty
+
           deriving (Ord, Eq, Show, Enum)
 
 gmap :: Map.Map Gene ([Gene] -> Int -> State -> ([Gene], Int, State))
@@ -78,20 +91,105 @@ gmap = Map.fromList [
     (IsGN,          isGN),
     (IsHN,          isHN),
     (IsIN,          isIN),
-    (JumpUnlessFlagTrue,        jumpUnlessFlagTrue),
-    (JumpUnlessFlagFalse,       jumpUnlessFlagFalse),
-    (JumpUnlessFlagAnd,         jumpUnlessFlagAnd),
-    (JumpUnlessFlagOr,          jumpUnlessFlagOr),
-    (JumpHere,                  jumpHere),  
+    (FlagTrue,      flagTrue),
+    (FlagFalse,     flagFalse),
+    (FlagAnd,       flagAnd),
+    (FlagOr,        flagOr),
     (FlagSwitch,    flagSwitch),
-    (Empty,         empty)
+    (Empty,         empty),
+
+    (APlayA,         putA PlayA),
+    (APlayB,         putA PlayB),
+    (APlayC,         putA PlayC),
+    (APlayD,         putA PlayD),
+    (APlayE,         putA PlayE),
+    (APlayF,         putA PlayF),
+    (APlayG,         putA PlayG),
+    (APlayH,         putA PlayH),
+    (APlayI,         putA PlayI),
+    (AIsAX,          putA IsAX),
+    (AIsBX,          putA IsBX),
+    (AIsCX,          putA IsCX),
+    (AIsDX,          putA IsDX),
+    (AIsEX,          putA IsEX),
+    (AIsFX,          putA IsFX),
+    (AIsGX,          putA IsGX),
+    (AIsHX,          putA IsHX),
+    (AIsIX,          putA IsIX),
+    (AIsAO,          putA IsAO),
+    (AIsBO,          putA IsBO),
+    (AIsCO,          putA IsCO),
+    (AIsDO,          putA IsDO),
+    (AIsEO,          putA IsEO),
+    (AIsFO,          putA IsFO),
+    (AIsGO,          putA IsGO),
+    (AIsHO,          putA IsHO),
+    (AIsIO,          putA IsIO),
+    (AIsAN,          putA IsAN),
+    (AIsBN,          putA IsBN),
+    (AIsCN,          putA IsCN),
+    (AIsDN,          putA IsDN),
+    (AIsEN,          putA IsEN),
+    (AIsFN,          putA IsFN),
+    (AIsGN,          putA IsGN),
+    (AIsHN,          putA IsHN),
+    (AIsIN,          putA IsIN),
+    (AFlagTrue,      putA FlagTrue),
+    (AFlagFalse,     putA FlagFalse),
+    (AFlagAnd,       putA FlagAnd),
+    (AFlagOr,        putA FlagOr),
+    (AFlagSwitch,    putA FlagSwitch),
+    (AEmpty,         putA Empty),
+
+    (BPlayA,         putB PlayA),
+    (BPlayB,         putB PlayB),
+    (BPlayC,         putB PlayC),
+    (BPlayD,         putB PlayD),
+    (BPlayE,         putB PlayE),
+    (BPlayF,         putB PlayF),
+    (BPlayG,         putB PlayG),
+    (BPlayH,         putB PlayH),
+    (BPlayI,         putB PlayI),
+    (BIsAX,          putB IsAX),
+    (BIsBX,          putB IsBX),
+    (BIsCX,          putB IsCX),
+    (BIsDX,          putB IsDX),
+    (BIsEX,          putB IsEX),
+    (BIsFX,          putB IsFX),
+    (BIsGX,          putB IsGX),
+    (BIsHX,          putB IsHX),
+    (BIsIX,          putB IsIX),
+    (BIsAO,          putB IsAO),
+    (BIsBO,          putB IsBO),
+    (BIsCO,          putB IsCO),
+    (BIsDO,          putB IsDO),
+    (BIsEO,          putB IsEO),
+    (BIsFO,          putB IsFO),
+    (BIsGO,          putB IsGO),
+    (BIsHO,          putB IsHO),
+    (BIsIO,          putB IsIO),
+    (BIsAN,          putB IsAN),
+    (BIsBN,          putB IsBN),
+    (BIsCN,          putB IsCN),
+    (BIsDN,          putB IsDN),
+    (BIsEN,          putB IsEN),
+    (BIsFN,          putB IsFN),
+    (BIsGN,          putB IsGN),
+    (BIsHN,          putB IsHN),
+    (BIsIN,          putB IsIN),
+    (BFlagTrue,      putB FlagTrue),
+    (BFlagFalse,     putB FlagFalse),
+    (BFlagAnd,       putB FlagAnd),
+    (BFlagOr,        putB FlagOr),
+    (BFlagSwitch,    putB FlagSwitch),
+    (BEmpty,         putB Empty)
     ]
 
 type Pos = Int
 data Mark = N | X | O deriving (Eq, Show)
 type Grid = [Mark]
 data GameState = Draw | XWins | OWins | Open deriving (Show)
-data Turn = XTurn | OTurn   
+data Turn = XTurn | OTurn
 type State = 
     ( Bool      -- Flag A
     , Bool      -- Flag B
@@ -177,36 +275,34 @@ isIN = is 8 N
 --
 -- 
 
-jumpUnlessFlagAnd, jumpUnlessFlagOr, jumpUnlessFlagTrue, jumpUnlessFlagFalse, empty, flagSwitch, jumpHere
+putA, putB :: Gene -> [Gene] -> Int -> State -> ([Gene], Int, State)
+putA g gs gi (fa, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba++[g], bb, grid))
+putB g gs gi (fa, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb++[g], grid))
+
+flagAnd, flagOr, flagTrue, flagFalse, empty, flagSwitch, doBranchA, doBranchB
     :: [Gene] -> Int -> State -> ([Gene], Int, State)
 
-jumpHere gs gi s = (gs, gi+1, s)
-empty gs gi s = (gs, gi+1, s)
+flagAnd gs gi (True, True, fs, ba, bb, grid) = doBranchA gs gi (True, True, fs, ba, bb, grid)
+flagAnd gs gi (fa, fb, fs, ba, bb, grid) = doBranchB gs gi (fa, fb, fs, ba, bb, grid)
+
+flagOr gs gi (True, fb, fs, ba, bb, grid) = doBranchA gs gi (True, fb, fs, ba, bb, grid)
+flagOr gs gi (fa, True, fs, ba, bb, grid) = doBranchA gs gi (fa, True, fs, ba, bb, grid)
+flagOr gs gi (fa, fb, fs, ba, bb, grid) = doBranchB gs gi (fa, fb, fs, ba, bb, grid)
+
+flagTrue gs gi (True, fb, fs, ba, bb, grid) = doBranchA gs gi (True, fb, fs, ba, bb, grid)
+flagTrue gs gi (fa, fb, fs, ba, bb, grid) = doBranchB gs gi (fa, fb, fs, ba, bb, grid)
+
+flagFalse gs gi (False, fb, fs, ba, bb, grid) = doBranchA gs gi (False, fb, fs, ba, bb, grid)
+flagFalse gs gi (fa, fb, fs, ba, bb, grid) = doBranchB gs gi (fa, fb, fs, ba, bb, grid)
+
+doBranchA gs gi (fa, fb, fs, ba, bb, grid) = (gs', 0, (fa, fb, fs, [], [], grid))
+    where gs' = ba ++ (drop (gi+1) gs)
+
+doBranchB gs gi (fa, fb, fs, ba, bb, grid) = (gs', 0, (fa, fb, fs, [], [], grid))
+    where gs' = bb ++ (drop (gi+1) gs)
+
 flagSwitch gs gi (fa, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, not fs, ba, bb, grid)) 
-
-jumpUnlessFlagAnd gs gi (True, True, fs, ba, bb, grid) = (gs, gi+1, (True, True, fs, ba, bb, grid))
-jumpUnlessFlagAnd gs gi s = jump 1 gs (gi+1) s 
-
-jumpUnlessFlagOr gs gi (True, fb, fs, ba, bb, grid) = (gs, gi+1, (True, fb, fs, ba, bb, grid))
-jumpUnlessFlagOr gs gi (fa, True, fs, ba, bb, grid) = (gs, gi+1, (fa, True, fs, ba, bb, grid))
-jumpUnlessFlagOr gs gi s = jump 1 gs (gi+1) s 
-
-jumpUnlessFlagTrue gs gi (True, fb, fs, ba, bb, grid) = (gs, gi+1, (True, fb, fs, ba, bb, grid))
-jumpUnlessFlagTrue gs gi s = jump 1 gs (gi+1) s 
-
-jumpUnlessFlagFalse gs gi (False, fb, fs, ba, bb, grid) = (gs, gi+1, (False, fb, fs, ba, bb, grid))
-jumpUnlessFlagFalse gs gi s = jump 1 gs (gi+1) s 
-
-jump :: Int -> [Gene] -> Int -> State -> ([Gene], Int, State)
-jump count gs gi s
-    | count == 0 || gi == length gs -1 = (gs, gi, s)
-    | otherwise = case gs !! gi of
-                    JumpUnlessFlagAnd -> jump (count+1) gs (gi+1) s
-                    JumpUnlessFlagOr -> jump (count+1) gs (gi+1) s
-                    JumpUnlessFlagTrue -> jump (count+1) gs (gi+1) s
-                    JumpUnlessFlagFalse -> jump (count+1) gs (gi+1) s
-                    JumpHere -> jump (count-1) gs (gi+1) s
-                    _ -> jump count gs (gi+1) s
+empty gs gi s = (gs, gi+1, s)
 
 -- | Fitness function mechanics ================================================
 
@@ -218,7 +314,7 @@ getState grid
     | otherwise =                   Open
    
 toState :: Grid -> State
-toState grid = (False, False, True, [], [], grid)
+toState grid = (False, False, False, [], [], grid)
 
 fromState :: State -> Grid
 fromState (_, _, _, _, _, grid) = grid
@@ -311,6 +407,6 @@ didMoveCorrectly (_, _, _, _, _, grid) numTurns = (length $ filter (/=N) grid) =
 -- | Manual testing of the runner ----------------------------------------------
 
 main = do
-    s <- score [IsAN, JumpUnlessFlagFalse, IsBN, JumpUnlessFlagTrue, PlayB, JumpHere, PlayA, JumpHere, PlayD]
+    s <- score [APlayA, FlagSwitch, IsAN, FlagTrue, PlayB]
     print s
 

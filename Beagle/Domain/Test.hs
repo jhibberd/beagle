@@ -30,7 +30,7 @@ gmap = Map.fromList [
     (Empty,         empty)
     ]
 
--- | Gene implementations ------------------------------------------------------
+-- | Math genes ----------------------------------------------------------------
 
 add', subtract', multiply', divide', incr', decr', empty :: 
     [Gene] -> Int -> State -> ([Gene], Int, State)
@@ -43,6 +43,41 @@ divide' gs gi (a, b)    = (gs, gi+1, (quot a b, 0))
 incr' gs gi (a, b)      = (gs, gi+1, (a, b+1))
 decr' gs gi (a, b)      = (gs, gi+1, (a, max 0 (b-1)))
 empty gs gi s           = (gs, gi+1, s)
+
+
+-- | Control flow genes --------------------------------------------------------
+
+{-
+jumpUnlessFlagAnd, jumpUnlessFlagOr, jumpUnlessFlagTrue, jumpUnlessFlagFalse, 
+flagSwitch, jumpHere, jump
+    :: [Gene] -> Int -> State -> ([Gene], Int, State)
+
+jumpHere gs gi s = (gs, gi+1, s)
+flagSwitch gs gi (fa, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, not fs, ba, bb, grid)) 
+
+jumpUnlessFlagAnd gs gi (True, True, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb, grid))
+jumpUnlessFlagAnd gs gi s = jump 1 ga (gi+1) s 
+
+jumpUnlessFlagOr gs gi (True, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb, grid))
+jumpUnlessFlagOr gs gi (fa, True, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb, grid))
+jumpUnlessFlagOr gs gi s = jump 1 ga (gi+1) s 
+
+jumpUnlessFlagTrue gs gi (True, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb, grid))
+jumpUnlessFlagTrue gs gi s = jump 1 ga (gi+1) s 
+
+jumpUnlessFlagFalse gs gi (False, fb, fs, ba, bb, grid) = (gs, gi+1, (fa, fb, fs, ba, bb, grid))
+jumpUnlessFlagFalse gs gi s = jump 1 ga (gi+1) s 
+
+jump count gs gi s
+    | count == 0 || gi == length gs -1 = gs gi s
+    | otherwise = case gs !! gi of
+                    JumpUnlessFlagAnd ->    jump (count+1) (gi+1) s
+                    JumpUnlessFlagOr ->     jump (count+1) (gi+1) s
+                    JumpUnlessFlagTrue ->   jump (count+1) (gi+1) s
+                    JumpUnlessFlagFalse ->  jump (count+1) (gi+1) s
+                    JumpHere ->             jump (count-1) (gi+1) s
+                    _ -> jump count gs (gi+1) s
+-}
 
 -- | Scoring function ----------------------------------------------------------
 
