@@ -88,7 +88,8 @@ solve !p !g !gen !hist = do
         Nothing -> do
             let s = modeAvg (map snd ep) Map.empty
                 hist' = addToHist s hist
-                ep' = traceShow s ep
+                ep'' = traceShow s ep
+                ep' = traceShow (diversity $ map fst ep) ep''
             (p', g') <- case isLocalOptima hist' of
                 True -> return (popSeed, g)
                 False -> evolve g ep'

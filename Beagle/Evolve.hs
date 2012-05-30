@@ -3,6 +3,8 @@
 
 module Beagle.Evolve
     ( evolve
+    , sublists
+    , diversity
     , tournamentSelection -- private
     , crossover -- private
     ) where
@@ -12,6 +14,10 @@ import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
 import Data.List
 import System.Random
+
+-- | Experimental
+import qualified Data.Set as Set
+
 
 type Genotype = [D.Gene]
 type Population = [Genotype]
@@ -102,4 +108,22 @@ parallelGet :: [a] -> [a] -> Int -> Bool -> a
 parallelGet as bs i flag
     | flag == True = as !! i
     | flag == False = bs !! i
+
+-- | Experimental
+--diversity :: [a] -> [a] -> Int
+--diversity a b =
+
+diversity :: Ord a => [[a]] -> Int
+diversity xs = Set.size . Set.unions $ map sublists xs
+
+sublists :: Ord a => [a] -> Set.Set [a]
+sublists xs = sublists' xs len (length xs - (len-1)) Set.empty
+    where len = 10 -- length of sublist
+
+sublists' :: Ord a => [a] -> Int -> Int -> Set.Set [a] -> Set.Set [a]
+sublists' _ _ 0 s = s
+sublists' xs len i s = sublists' xs len (i-1) $ Set.insert (pullout xs i len) s
+
+pullout :: [a] -> Int -> Int -> [a]
+pullout xs start len = drop (start-1) . fst $ splitAt (start+(len-1)) xs
 

@@ -199,7 +199,7 @@ jumpUnlessFlagFalse gs gi s = jump 1 gs (gi+1) s
 
 jump :: Int -> [Gene] -> Int -> State -> ([Gene], Int, State)
 jump count gs gi s
-    | count == 0 || gi == length gs -1 = (gs, gi, s)
+    | count == 0 || gi >= (length gs -1) = (gs, gi, s)
     | otherwise = case gs !! gi of
                     JumpUnlessFlagAnd -> jump (count+1) gs (gi+1) s
                     JumpUnlessFlagOr -> jump (count+1) gs (gi+1) s
