@@ -22,6 +22,15 @@ type Score = Float
 blankGenotype :: [D.Gene]
 blankGenotype = replicate (fromIntegral D.genotypeLength) D.Empty
 
+
+-- | Create a new genotype consisting of randomly chosen genes.
+mkgenotype :: RandomGen g => g -> (Genotype, g)
+mkgenotype = f D.genotypeLength
+    where f 0 g = ([], g)
+          f n g = let (x, g') = R.gene g
+                      (xs, g'') = f (n-1) g'
+                  in (x:xs, g'')
+
 -- | Using the domain's fitness function (D.score), calculate the score (a value
 -- between 0 and 1) of each genotype in the population. The resultant list of
 -- genotype/score pairs is sorted by score.
@@ -35,8 +44,12 @@ popScore = fmap sort . sequence . map score
 
 -- | Generate a list (population) of genotypes consisting of randomly chosen
 -- genes. The size of the population is fixed and determined by the domain.
-popSeed :: Population
-popSeed = replicate D.populationSize blankGenotype
+popSeed :: RandomGen g => g -> (Population, g)
+popSeed = f D.populationSize
+    where f 0 g = ([], g)
+          f n g = let (p, g') =   mkgenotype g
+                      (ps, g'') = f (n-1) g'
+                  in (p:ps, g'')
 
 -- Experimental
 
@@ -91,12 +104,13 @@ solve !p !g !gen !hist = do
                 ep'' = traceShow s ep
                 ep' = traceShow (diversity $ map fst ep) ep''
             (p', g') <- case isLocalOptima hist' of
-                True -> return (popSeed, g)
+                True -> evolve g ep' --return (popSeed, g)
                 False -> evolve g ep'
             solve p' g' (gen+1) hist'
 
 main = do 
     Log.setUp
-    g <- solve popSeed R.g 1 []
+    let (p, g') = popSeed R.g
+    g <- solve p g' 1 []
     print g
 
