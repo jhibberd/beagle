@@ -12,6 +12,7 @@ module Beagle.Evolve
 import qualified Beagle.Domain as D
 import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
+import Beagle.Eval
 import Data.List
 import System.Random
 
@@ -37,30 +38,36 @@ evolve g ps = f D.populationSize g
               (xs, g'') <- f (n-1) g'
               return (x:xs, g'')
           make g = do
-              let (parentA, g') =   tournamentSelection ps 10 g
-                  (parentB, g'') =  tournamentSelection ps 10 g'
+              let (parentA, scoreA, g') =   tournamentSelection ps 10 g
+                  (parentB, scoreB, g'') =  tournamentSelection ps 10 g'
                   (child, g''') =   crossover parentA parentB 30 g''
                   (child', g'''') = mutate child g'''
+                  -- TODO(jhibberd) Get best parent score
+                  (bestParent, bestScore) = if scoreA <= scoreB 
+                                                then (parentA, scoreA)
+                                                else (parentB, scoreB)
+              -- TODO(jhibberd) eval the child.
+              s <- D.score child'
+              -- TODO(jhibberd) If child worse than best parent, drop child
+              -- and return best parent
+              let xx = if s > bestScore then bestParent else child'
+              -- TODO(jhibberd) Maybe mutate the parent?
               -- # let (a:b:[], g') = pair g -- pick pair to breed
                   -- #(c, g'') = breed a b g'
                   -- mutate genes to avoid unhealthy gene pool convergence
                   -- # (c', g''') = (mutate c g'')
               Log.evolve parentA parentB child'
-              return (child', g'''')
-          -- # mset = multiset . nub . map fst $ ps
-          -- #pair g
-          -- #    | length mset > 1 = R.pick mset 2 g
-          -- #    | otherwise = (mset++mset, g)
+              return (xx, g'''')
 
 -- | Pick an individual from a population by first picking a sample of size 'n'
 -- then selecting the individual from the sample with the best fitness.
 -- 
 -- If the tournament size is large, weak individuals have a smaller chance of
 -- being selected.
-tournamentSelection :: RandomGen g => [(a, Float)] -> Int -> g -> (a, g)
+tournamentSelection :: RandomGen g => [(a, Float)] -> Int -> g -> (a, Float, g)
 tournamentSelection ps n g = let (sample, g') = R.pick ps n g
-                                 p = fst . head $ sortSnd sample
-                             in (p, g')
+                                 (p, s) = head $ sortSnd sample
+                             in (p, s, g')
 
 sortSnd :: Ord b => [(a, b)] -> [(a, b)]
 sortSnd = sortBy (\a b -> compare (snd a) (snd b))
