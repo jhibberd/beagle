@@ -40,24 +40,25 @@ evolve g ps = f D.populationSize g
           make g = do
               let (parentA, scoreA, g') =   tournamentSelection ps 10 g
                   (parentB, scoreB, g'') =  tournamentSelection ps 10 g'
-                  (child, g''') =   crossover parentA parentB 30 g''
+                  (child, g''') =   crossover parentA parentB 1 g''
                   (child', g'''') = mutate child g'''
                   -- TODO(jhibberd) Get best parent score
                   (bestParent, bestScore) = if scoreA <= scoreB 
                                                 then (parentA, scoreA)
                                                 else (parentB, scoreB)
+                  (bestParent', g5) = mutate bestParent g''''
               -- TODO(jhibberd) eval the child.
               s <- D.score child'
               -- TODO(jhibberd) If child worse than best parent, drop child
               -- and return best parent
-              let xx = if s > bestScore then bestParent else child'
+              let xx = if s > bestScore then bestParent' else child'
               -- TODO(jhibberd) Maybe mutate the parent?
               -- # let (a:b:[], g') = pair g -- pick pair to breed
                   -- #(c, g'') = breed a b g'
                   -- mutate genes to avoid unhealthy gene pool convergence
                   -- # (c', g''') = (mutate c g'')
               Log.evolve parentA parentB child'
-              return (xx, g'''')
+              return (xx, g5)
 
 -- | Pick an individual from a population by first picking a sample of size 'n'
 -- then selecting the individual from the sample with the best fitness.
