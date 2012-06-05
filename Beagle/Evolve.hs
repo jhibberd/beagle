@@ -30,8 +30,9 @@ type Score = Float
 evolve :: RandomGen g
        => g
        -> [(Genotype, Score)]
+       -> Int
        -> IO (Population, g)
-evolve g ps = f D.populationSize g
+evolve g ps popSize = f popSize g
     where f 0 g = return ([], g)
           f n g = do
               (!x, g') <- make g
@@ -46,19 +47,36 @@ evolve g ps = f D.populationSize g
                   (bestParent, bestScore) = if scoreA <= scoreB 
                                                 then (parentA, scoreA)
                                                 else (parentB, scoreB)
-                  (bestParent', g5) = mutate bestParent g''''
               -- TODO(jhibberd) eval the child.
               s <- D.score child'
               -- TODO(jhibberd) If child worse than best parent, drop child
               -- and return best parent
-              let xx = if s > bestScore then bestParent' else child'
+              let (xx, gg) = if s > bestScore 
+                        then changeParent bestParent g''''
+                        else (child', g'''')
               -- TODO(jhibberd) Maybe mutate the parent?
               -- # let (a:b:[], g') = pair g -- pick pair to breed
                   -- #(c, g'') = breed a b g'
                   -- mutate genes to avoid unhealthy gene pool convergence
                   -- # (c', g''') = (mutate c g'')
               Log.evolve parentA parentB child'
-              return (xx, g5)
+              return (xx, gg)
+
+changeParent :: RandomGen g => [D.Gene] -> g -> ([D.Gene], g)
+changeParent xs g = let (n, g') = randomR (1, 10) g
+                    in f n xs g'
+    where f :: RandomGen g => Int -> Genotype -> g -> (Genotype, g)
+          f n 
+            | n >= 8 = reproduce
+            | n >= 7 = rotate
+            | otherwise = mutate
+        
+
+rotate :: RandomGen g => [a] -> g -> ([a], g)
+rotate xs g = ([last xs] ++ init xs, g)
+
+reproduce :: RandomGen g => [a] -> g -> ([a], g)
+reproduce xs g = (xs, g) 
 
 -- | Pick an individual from a population by first picking a sample of size 'n'
 -- then selecting the individual from the sample with the best fitness.
