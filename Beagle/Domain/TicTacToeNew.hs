@@ -16,8 +16,8 @@ import Debug.Trace
 import System.IO.Unsafe
 import System.Random
 
-genotypeLength =        500
-randomSeed =            12     :: Int
+genotypeLength =        700
+randomSeed =            60     :: Int
 
 {-
 
@@ -262,10 +262,10 @@ flowIf, flowUnless, flowEnd
 
 flowIf gs gi state@(ptn, grid) = case match ptn grid of
                                      True -> (gs, gi+1, state)
-                                     False -> skipToEnd 1 gs gi state
+                                     False -> skipToEnd 1 gs (gi+1) state
 
 flowUnless gs gi state@(ptn, grid) = case match ptn grid of
-                                         True -> skipToEnd 1 gs gi state
+                                         True -> skipToEnd 1 gs (gi+1) state
                                          False -> (gs, gi+1, state)
 
 match :: Pattern -> Grid -> Bool
@@ -372,12 +372,11 @@ playGame gs (_, grid) g nt t =
                         playGame gs (toState b') g' (nt+1) OTurn
 
                     OTurn -> do
-                        s <- eval gs gmap 0 (toState grid)
-                        if didMoveCorrectly s (nt+1)
+                        (ptn', grid') <- eval gs gmap 0 (toState grid)
+                        if didMoveCorrectly grid' (nt+1)
                             then do
-                                let s' = show $ fromState s
-                                Log.msg gs ("F " ++ show grid ++ " -> " ++ s')
-                                playGame gs s g (nt+1) XTurn
+                                Log.msg gs ("F " ++ show grid ++ " -> " ++ show ptn' ++ show grid')
+                                playGame gs (toState grid') g (nt+1) XTurn
                             else do 
                                 Log.msg gs ("BAD_MOVE at " ++ show nt)
                                 return (25-nt, g)
@@ -386,14 +385,13 @@ playGame gs (_, grid) g nt t =
         OWins ->    do { Log.msg gs "+ O_WIN"; return (0, g) }
         Draw ->     do { Log.msg gs "+ DRAW"; return (0, g) }
 
-didMoveCorrectly :: State -> Int -> Bool
-didMoveCorrectly (_, grid) numTurns = (length $ filter (/=N) grid) == numTurns 
+didMoveCorrectly :: Grid -> Int -> Bool
+didMoveCorrectly grid numTurns = (length $ filter (/=N) grid) == numTurns 
 
 -- | Manual testing of the runner ----------------------------------------------
 
 {-
 main = do
-    s <- score [IsAN, JumpUnlessFlagFalse, IsBN, JumpUnlessFlagTrue, PlayB, JumpHere, PlayA, JumpHere, PlayD]
+    s <- score [SetAF, If, SetBF, If, PlayB, End, PlayA, End, Reset, PlayC]
     print s
 -}
-
