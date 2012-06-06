@@ -39,8 +39,8 @@ evolve g ps popSize = f popSize g
               (xs, g'') <- f (n-1) g'
               return (x:xs, g'')
           make g = do
-              let (parentA, scoreA, g') =   tournamentSelection ps 10 g
-                  (parentB, scoreB, g'') =  tournamentSelection ps 10 g'
+              let (parentA, scoreA, g') =   tournamentSelection ps 30 g
+                  (parentB, scoreB, g'') =  tournamentSelection ps 30 g'
                   (child, g''') =   crossover parentA parentB 1 g''
                   (child', g'''') = mutate child g'''
                   -- TODO(jhibberd) Get best parent score
@@ -68,7 +68,7 @@ changeParent xs g = let (n, g') = randomR (1, 10) g
     where f :: RandomGen g => Int -> Genotype -> g -> (Genotype, g)
           f n 
             | n >= 8 = reproduce
-            | n >= 7 = rotate
+            | n >= 6 = rotate
             | otherwise = mutate
         
 
