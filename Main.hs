@@ -4,7 +4,6 @@ import qualified Beagle.Domain as D
 import Beagle.Evolve
 import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
---import Beagle.Type
 import Data.List (sortBy, genericLength)
 import System.Random
 
@@ -15,13 +14,10 @@ type Genotype = [D.Gene]
 type Population = [Genotype]
 type Score = Float
 
--- | Create a new genotype consisting of 'Empty' genes. 
---
--- The genetic algorithm works better when starting with 'Empty' genes rather
--- than starting with a sequence of randomly selected genes.
-blankGenotype :: [D.Gene]
-blankGenotype = replicate (fromIntegral D.genotypeLength) D.Empty
-
+-- | Define population size. According to research this should be as big as the
+-- memory in the execution environment will allow. Certainly >500.
+popSize :: Int
+popSize = 1000
 
 -- | Create a new genotype consisting of randomly chosen genes.
 mkgenotype :: RandomGen g => g -> (Genotype, g)
@@ -35,7 +31,7 @@ mkgenotype = f D.genotypeLength
 -- between 0 and 1) of each genotype in the population. The resultant list of
 -- genotype/score pairs is sorted by score.
 popScore :: [Genotype] -> IO [(Genotype, Score)]
-popScore = fmap sort . sequence . map score
+popScore gt = fmap sort . sequence $ map score gt
     where sort = sortBy (\a b -> compare (snd a) (snd b))
           score x = do
               s <- D.score x
@@ -45,36 +41,20 @@ popScore = fmap sort . sequence . map score
 -- | Generate a list (population) of genotypes consisting of randomly chosen
 -- genes. The size of the population is fixed and determined by the domain.
 popSeed :: RandomGen g => g -> (Population, g)
-popSeed = f D.populationSize
-    where f 0 g = ([], g)
-          f n g = let (p, g') =   mkgenotype g
-                      (ps, g'') = f (n-1) g'
-                  in (p:ps, g'')
+popSeed !g = f 0 g []
+    where f :: RandomGen g => Int -> g -> [[D.Gene]] -> (Population, g)
+          f n !g xs 
+              | n == popSize = (xs, g)
+              | otherwise = let (x, g') = mkgenotype g
+                            in f (n+1) g' (x:xs)
 
--- Experimental
-
+-- Debug
 modeAvg :: (Ord a) => [a] -> Map.Map a Int -> (a, Int)
 modeAvg [] m = head . reverse . sortBy (\a b -> compare (snd a) (snd b)) $ Map.toList m
 modeAvg (x:xs) m = modeAvg xs (Map.insert x (getFreq x +1) m)
     where getFreq k = case Map.lookup k m of
                         Nothing -> 0
                         (Just x) -> x
-
-
-addToHist :: (a, Int) -> [(a, Int)] -> [(a, Int)]
-addToHist x xs = take 80 (x:xs)
-
-isLocalOptima :: [(Float, Int)] -> Bool
-isLocalOptima xs
-    | length xs < 80 = False
-    | otherwise = case all stalePop xs of
-                      True -> trace (show "LO! " ++ show xs) True
-                      False -> False
-
-stalePop :: (Float, Int) -> Bool
-stalePop (a, n) = n > 270 && a < 0.99
-
--- END
 
 -- | Given a list of genotypes and their evaluated scores, return the first
 -- genotype whose score is 0 (exhibits target phenotype), or Nothing if none
@@ -91,26 +71,21 @@ solve :: RandomGen g
       => Population 
       -> g
       -> Int -- Generation
-      -> [(Score, Int)]
       -> IO Genotype
-solve !p !g !gen !hist = do
+solve !p !g !gen = do
     Log.generation gen p
     ep <- popScore p
     case (solutions ep) of
         (Just x) -> return x
         Nothing -> do
             let s = modeAvg (map snd ep) Map.empty
-                hist' = addToHist s hist
-                ep'' = traceShow s ep
-                ep' = traceShow (diversity $ map fst ep) ep''
-            (p', g') <- case isLocalOptima hist' of
-                True -> evolve g ep' --return (popSeed, g)
-                False -> evolve g ep'
-            solve p' g' (gen+1) hist'
+                ep' = traceShow s ep
+            (p', g') <- evolve g ep' popSize 
+            solve p' g' (gen+1)
 
 main = do 
     Log.setUp
     let (p, g') = popSeed R.g
-    g <- solve p g' 1 []
+    g <- solve p g' 1
     print g
 

@@ -39,7 +39,7 @@ maybeCropLogs = do
 -- Increment the generation count and log all the genotypes (against their
 -- hashes).
 generation :: (Show a) => Int -> [a] -> IO ()
-generation !gen ps = do
+generation !gen !ps = do
         writeFile generationFile (show gen)
         maybeCropLogs
         p <- logPath "genotype"
