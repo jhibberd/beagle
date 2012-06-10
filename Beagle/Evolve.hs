@@ -3,26 +3,33 @@
 
 module Beagle.Evolve
     ( evolve
-    , sublists
-    , diversity
     , tournamentSelection -- private
     , crossover -- private
+    , mutate -- private
+    , replicate -- private
+    , mutate' -- private
+    , crossover' -- private
     ) where
 
 import qualified Beagle.Domain as D
 import qualified Beagle.Log as Log
 import qualified Beagle.Random as R
 import Beagle.Eval
-import Data.List
+import Data.List hiding (replicate)
 import System.Random
+import Prelude hiding (replicate)
 
--- | Experimental
-import qualified Data.Set as Set
 
+-- | CONFIG --------------------------------------------------------------------
+
+tournamentSize = 30
+pMutates = 0.01
+pCrossover = 0.05
 
 type Genotype = [D.Gene]
 type Population = [Genotype]
 type Score = Float
+type Genome = [D.Gene]
 
 -- | Given a population of genotypes and their observed phenotypes, generate a
 -- new population (generation) that will *probably* or *logically* perform 
@@ -39,6 +46,7 @@ evolve g ps popSize = f popSize g
               (xs, g'') <- f (n-1) g'
               return (x:xs, g'')
           make g = do
+              {-
               let (parentA, scoreA, g') =   tournamentSelection ps 30 g
                   (parentB, scoreB, g'') =  tournamentSelection ps 30 g'
                   (child, g''') =   crossover parentA parentB 1 g''
@@ -61,7 +69,10 @@ evolve g ps popSize = f popSize g
                   -- # (c', g''') = (mutate c g'')
               Log.evolve parentA parentB child'
               return (xx, gg)
+              -}
+              return ([], g)
 
+{-
 changeParent :: RandomGen g => [D.Gene] -> g -> ([D.Gene], g)
 changeParent xs g = let (n, g') = randomR (1, 10) g
                     in f n xs g'
@@ -70,86 +81,69 @@ changeParent xs g = let (n, g') = randomR (1, 10) g
             | n >= 8 = reproduce
             | n >= 6 = rotate
             | otherwise = mutate
-        
+-}
 
-rotate :: RandomGen g => [a] -> g -> ([a], g)
-rotate xs g = ([last xs] ++ init xs, g)
+-- | GENETIC OPERATORS ---------------------------------------------------------
 
-reproduce :: RandomGen g => [a] -> g -> ([a], g)
-reproduce xs g = (xs, g) 
+-- | Replicate an individual (unchanged) to the next generation.
+replicate :: RandomGen g => [([a], Float)] -> g -> ([a], g)
+replicate = tournamentSelection
+
+-- | TODO Mutate n randomly chosen genes of a genotype to prevent the population
+-- from iteratively converging around a small subset of all available genes.
+mutate :: RandomGen g => [(Genome, Float)] -> g -> (Genome, g)
+mutate pop g = let (individual, g') = tournamentSelection pop g
+               in mutate' individual g' pMutates R.gene
+
+mutate' :: RandomGen g => [a] -> g -> Float -> (g -> (a, g)) -> ([a], g)
+mutate' xs g p m = mapS xs f g
+    where f x g = let (outcome, g') = prob p g
+                  in case outcome of
+                         True ->  m g'
+                         False -> (x, g')
+
+crossover :: RandomGen g => [([a], Float)] -> g -> ([a], g)
+crossover pop g = let (parentA, g') =  tournamentSelection pop g
+                      (parentB, g'') = tournamentSelection pop g'
+                      (first, g''') =  randomR (False, True) g''
+                  in crossover' (zip parentA parentB) g''' first pCrossover
+
+crossover' :: RandomGen g => [(a, a)] -> g -> Bool -> Float -> ([a], g)
+crossover' xs g focus p = let (xs', (g', _)) = mapS xs f (g, focus)
+                          in (xs', g')
+    where f x (g, focus) = let (switch, g') = prob p g
+                               focus' = case switch of
+                                            True -> not focus
+                                            False -> focus
+                           in case focus of
+                                True -> (fst x, (g', focus'))
+                                False -> (snd x, (g', focus'))
+
+-- | GENETIC OPERATOR UTILITIES ------------------------------------------------
 
 -- | Pick an individual from a population by first picking a sample of size 'n'
 -- then selecting the individual from the sample with the best fitness.
 -- 
 -- If the tournament size is large, weak individuals have a smaller chance of
 -- being selected.
-tournamentSelection :: RandomGen g => [(a, Float)] -> Int -> g -> (a, Float, g)
-tournamentSelection ps n g = let (sample, g') = R.pick ps n g
-                                 (p, s) = head $ sortSnd sample
-                             in (p, s, g')
+tournamentSelection :: RandomGen g => [([a], Float)] -> g -> ([a], g)
+tournamentSelection ps g = let (sample, g') = R.pick ps tournamentSize g
+                               p = fst . head $ sortSnd sample
+                           in (p, g')
 
+-- | Sort a list of tuples by its second element.
 sortSnd :: Ord b => [(a, b)] -> [(a, b)]
 sortSnd = sortBy (\a b -> compare (snd a) (snd b))
 
+-- | Given an event probability and pseudo random number generator return 
+-- whether the event "happened".
+prob :: RandomGen g => Float -> g -> (Bool, g)
+prob p g = let (x, g') = randomR (0.0, 1.0) g
+           in ((x <= p), g')
 
--- | Mutate n randomly chosen genes of a genotype to prevent the population
--- from iteratively converging around a small subset of all available genes.
---
--- A 1% rate of mutation appears to work well. Too small and the population
--- converges on a small gene pool; too large and the benefits of crossover are
--- lost to random mutations.
-mutate :: RandomGen g => Genotype -> g -> (Genotype, g)
-mutate gt g = R.map (\_ g -> R.gene g) gt numMutations g
-    where numMutations = ceiling $ (fromInteger D.genotypeLength) * mutationRate
-          mutationRate = 0.01
-
-
--- | TODO(jhibberd) Pick n random points in the chromosome, for the child use
--- all contiguous genes up to random point 1 from parent A the all contiguous
--- blocks from parentB up to point 2 etc. Which parent starts should be random
-
-crossover :: RandomGen g => [a] -> [a] -> Int -> g -> ([a], g)
-crossover pa pb n g = let (startParent, g') = getStartParent
-                          (pts, g'') = points g'
-                          child = crossover' pa pb 0 pts startParent
-                    in (child, g'')
-    where points g = let (sample, g') = R.pick [0 .. (length pa -1)] n g
-                     in (sort sample, g')
-          getStartParent = randomR (False, True) g
-
-crossover' :: [a] -> [a] -> Int -> [Int] -> Bool -> [a]
-crossover' pa pb i is flag
-    | i == length pa = []
-    | otherwise = let c =            parallelGet pa pb i flag
-                      (flag', is') = maybeSwitchFlag flag i is
-                  in c : crossover' pa pb (i+1) is' flag'
-
-maybeSwitchFlag :: Bool -> Int -> [Int] -> (Bool, [Int])
-maybeSwitchFlag flag _ [] = (flag, [])
-maybeSwitchFlag flag i is@(i':is')
-    | i == i' = (not flag, is')
-    | otherwise = (flag, is)
-
-parallelGet :: [a] -> [a] -> Int -> Bool -> a
-parallelGet as bs i flag
-    | flag == True = as !! i
-    | flag == False = bs !! i
-
--- | Experimental
---diversity :: [a] -> [a] -> Int
---diversity a b =
-
-diversity :: Ord a => [[a]] -> Int
-diversity xs = Set.size . Set.unions $ map sublists xs
-
-sublists :: Ord a => [a] -> Set.Set [a]
-sublists xs = sublists' xs len (length xs - (len-1)) Set.empty
-    where len = 10 -- length of sublist
-
-sublists' :: Ord a => [a] -> Int -> Int -> Set.Set [a] -> Set.Set [a]
-sublists' _ _ 0 s = s
-sublists' xs len i s = sublists' xs len (i-1) $ Set.insert (pullout xs i len) s
-
-pullout :: [a] -> Int -> Int -> [a]
-pullout xs start len = drop (start-1) . fst $ splitAt (start+(len-1)) xs
+mapS :: [a] -> (a -> s -> (b, s)) -> s -> ([b], s)
+mapS [] _ s = ([], s)
+mapS (x:xs) f s = let (x', s') =    f x s
+                      (xs', s'') =  mapS xs f s'
+                  in (x':xs', s'')
 
