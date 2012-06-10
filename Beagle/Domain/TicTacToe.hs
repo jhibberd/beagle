@@ -15,7 +15,6 @@
 module Beagle.Domain
     ( Gene(..)
     , genotypeLength
-    , populationSize
     , randomSeed
     , score
     ) where
@@ -28,7 +27,6 @@ import System.IO.Unsafe
 import System.Random
 
 genotypeLength =        500
-populationSize =        300    :: Int
 randomSeed =            12     :: Int
 
 
