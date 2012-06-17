@@ -59,10 +59,13 @@ detectTurn s = case (numX == numO) of True -> 1; False -> (-1)
 -- | Given a list of scenarios, transform each scenario to its base case and 
 -- return a list of unique base cases.
 toBases :: [Scenario] -> [Scenario]
-toBases = nub . map toBase
+toBases = nub . map (fst . toBase)
 
 -- | Transform a single scenario to its base case.
-toBase :: Scenario -> Scenario
+--
+-- A 'restore' function is also returned to transform the base case back to 
+-- its original form.
+toBase :: Scenario -> (Scenario, Scenario -> Scenario)
 toBase = getBase . variants
 
 -- | Given a list of 8 symmetrical scenarios, pick the base case (the one with 
@@ -71,8 +74,8 @@ toBase = getBase . variants
 -- Lexicographical order proved more efficient than hashing each scenario and 
 -- picking the one with the lowest hash - and is sufficient; we just need an
 -- arbitrary but deterministic member of the varitions to act as the base.
-getBase :: [Scenario] -> Scenario
-getBase = head . sort 
+getBase :: Ord a => [(a, b)] -> (a, b)
+getBase = head . sortBy (\(a, x) (b, y) -> compare a b) 
 
 -- | Return whether a scenario represents a completed game (ie. there has been
 -- a win or draw).
@@ -83,10 +86,24 @@ hasScenarioEnded s
     | isDraw s =                    True
     | otherwise =                   False
 
--- | Given a scenario return all 8 symmetrical variations.
-variants :: Scenario -> [Scenario]
-variants g = rotateAll g ++ rotateAll (flip g)
-    where rotateAll g = scanl (\x f -> f x) g (replicate 3 rotate)
+-- | Given a scenario return all 8 symmetrical variations along with a function
+-- that can be applied to any of the variations to restore the original 
+-- scenario.
+--
+-- This 'restore' function is used to transform a base scenario to its original
+-- form after a mark has been placed.
+variants :: Scenario -> [(Scenario, Scenario -> Scenario)]
+variants s = map (\(f, rev) -> (f s, rev)) fs
+    where fs = [
+            (id,                                id),
+            (rotate,                            rotate. rotate. rotate),
+            (rotate. rotate,                    rotate. rotate),
+            (rotate. rotate. rotate,            rotate),
+            (flip,                              flip),
+            (rotate. flip,                      flip. rotate. rotate. rotate),
+            (rotate. rotate. flip,              flip. rotate. rotate),
+            (rotate. rotate. rotate. flip,      flip. rotate)
+            ]
 
 -- | Rotate a scenario 90 degrees clockwise.
 -- 
@@ -120,7 +137,7 @@ subsequentScenarios s = let is = immediateScenarios s
                             ss = nub . concat $ map subsequentScenarios is
                         in s:ss
 
---main = print . length $ subsequentScenarios [0, 0, 0, 0, 0, 0, 0, 0, 0]
+main = print . length $ subsequentScenarios [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 -- HASH TABLE ------------------------------------------------------------------
 
@@ -135,17 +152,32 @@ buildTable :: Map.Map Int Int
 buildTable = Map.fromList $ zip scenarioKeys [0..] 
     where scenarioKeys = map toKey . subsequentScenarios $ replicate 9 0
 
--- TODO Remove BaseCase.hs and rename AllCases.hs to Utility.hs
--- | TODO
-
 -- | Return the gene index associated with a scenario.
+-- TODO(jhibberd) This function should take a base, not any scenario
 scenarioIndex :: Scenario -> Int
 scenarioIndex s = case Map.lookup k buildTable of
                       (Just i) -> i
                       Nothing ->  error "Illegal scenario"
-    where k = toKey $ toBase s
+    where k = toKey . fst $ toBase s
+{-
+1. Get scenario
+2. Get base and restore f
+3. Get alleles index
+4. Get solution index
+5. Apply solution to base
+6. apply restore f to modified f
+-}
 
+-- TODO
+{-
+type Alleles = [Int]
+type Genome = Map.Map Int Int
+f :: Genome -> Alleles -> Scenario -> Scenario
+f g a s = scenarioIndex s
+-}
+
+{-
 main = do
     let t = buildTable
     print $ scenarioIndex [0, 0, 0, 1, 1, 0, 0, (-1), 0]
-
+-}
