@@ -1,4 +1,5 @@
 import Data.List
+import qualified Data.Map as Map
 import Data.Maybe
 import Prelude hiding (flip)
 
@@ -119,5 +120,32 @@ subsequentScenarios s = let is = immediateScenarios s
                             ss = nub . concat $ map subsequentScenarios is
                         in s:ss
 
-main = print . length $ subsequentScenarios [0, 0, 0, 0, 0, 0, 0, 0, 0]
+--main = print . length $ subsequentScenarios [0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+-- HASH TABLE ------------------------------------------------------------------
+
+-- | Express a scenario as an int, for use as a hash table key.
+toKey :: Scenario -> Int
+toKey g = foldr f 0 (zip [0..] (allPositive g))
+    where f (i, x) b = b + (x * (10 ^ i))
+          allPositive = map (\x -> case x of (-1) -> 1; 0 -> 2; 1 -> 3)
+
+-- | Build a table of gene index positions, keyed by base scenarios.
+buildTable :: Map.Map Int Int
+buildTable = Map.fromList $ zip scenarioKeys [0..] 
+    where scenarioKeys = map toKey . subsequentScenarios $ replicate 9 0
+
+-- TODO Remove BaseCase.hs and rename AllCases.hs to Utility.hs
+-- | TODO
+
+-- | Return the gene index associated with a scenario.
+scenarioIndex :: Scenario -> Int
+scenarioIndex s = case Map.lookup k buildTable of
+                      (Just i) -> i
+                      Nothing ->  error "Illegal scenario"
+    where k = toKey $ toBase s
+
+main = do
+    let t = buildTable
+    print $ scenarioIndex [0, 0, 0, 1, 1, 0, 0, (-1), 0]
 
