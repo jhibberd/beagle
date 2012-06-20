@@ -6,6 +6,8 @@ import Data.Maybe
 import Prelude hiding (flip)
 import System.Random
 
+import Debug.Trace
+
 type Scenario = [Int] -- 9-dimensional vector representing game scenario
 type Player = Int -- 1 or (-1)
 
@@ -174,7 +176,7 @@ solve :: Alleles -> Scenario -> Scenario
 solve al scn = let (base, restore) = toBase scn
                    idx = scenarioIndex base
                    solution = al !! idx
-                   scn' = play scn solution
+                   scn' = play base solution
                    scn'' = restore scn'
                in scn''
 
@@ -206,74 +208,129 @@ mkPopulation !g = mkPopulation' populationSize g
                                    (xs, g'') = mkPopulation' (n-1) g'
                                in (x:xs, g'') 
 
+{- NEXT... (then evolve)
+
+-- | Using the domain's fitness function (D.score), calculate the score (a value
+-- between 0 and 1) of each genotype in the population. The resultant list of
+-- genotype/score pairs is sorted by score.
+popScore :: [Genotype] -> IO [(Genotype, Score)]
+popScore gt = fmap sort . sequence $ map score gt
+    where sort = sortBy (\a b -> compare (snd a) (snd b))
+          score x = do
+              s <- D.score x
+              Log.score x s
+              return (x, s)
+
+-- | Given a list of genotypes and their evaluated scores, return the first
+-- genotype whose score is 0 (exhibits target phenotype), or Nothing if none
+-- can be found.
+solutions :: [(Genotype, Score)] -> Maybe Genotype
+solutions p =
+    case (map fst . filter (\gt -> snd gt == 0) $ p) of
+        [] -> Nothing
+        (x:xs) -> Just x
+
+-- Given a seed population, intelligently evolve the population until a member
+-- exhibits the target phenotype.
+solve :: RandomGen g 
+      => Population 
+      -> g
+      -> Int -- Generation
+      -> IO Genotype
+solve !p !g !gen = do
+    Log.generation gen p
+    ep <- popScore p
+    case (solutions ep) of
+        (Just x) -> return x
+        Nothing -> do
+            let s = modeAvg (map snd ep) Map.empty
+                ep' = traceShow s ep
+            (p', g') <- evolve g ep' popSize 
+            solve p' g' (gen+1)
+
+main = do 
+    Log.setUp
+    let (p, g') = popSeed R.g
+    g <- solve p g' 1
+    print g
+-}
 --main = print $ mkPopulation (mkStdGen 0)
 
 -- FITNESS EVALUATION ----------------------------------------------------------
 
-numGames = 100 -- TODO(jhibberd) Replace with system that plays all possible games.
+numGames = 40 -- TODO(jhibberd) Replace with system that plays all possible games.
 
+-- | Given a list of outcomes (success/failure) calculate and return a score.
+score :: [Bool] -> Float
+score xs =  (realToFrac total - realToFrac lost) / realToFrac total
+    where total = length xs
+          lost = length $ filter (==False) xs
 
--- TODO(jhibberd) Clean up
-hostPlay :: RandomGen g => Scenario -> g -> (Scenario, g)
-hostPlay grid g = let (i, g') = randomR (0, (length freeonly)-1) g
-                      i'' = freeonly !! i
-                      (_, _, (_, grid')) = play X i'' [] 0 (toState grid)
-                  in (grid', g')
-    where zipped = zip grid [0..]
-          freeonly = map snd $ filter ((==N) . fst) zipped
+-- | Play n games and return a fitness score based on the aggregated outcomes.
+evalFitness :: RandomGen g 
+            => (Scenario -> Scenario) -- genome function 
+            -> g 
+            -> IO Float
+evalFitness gnm g = do 
+        outcomes <- evalFitness' gnm numGames g
+        return (score outcomes)
+    where evalFitness' gnm 0 _ = return []
+          evalFitness' gnm n g = do
+              (x, g') <- playGame gnm emptyScenario g (getPlayer n)
+              xs <- evalFitness' gnm (n-1) g'
+              return (x:xs)
+          getPlayer n = case (odd n) of True -> 1; False -> (-1)
+          emptyScenario = replicate 9 0
 
-toScore :: [Int] -> Float
-toScore xs = 1 - (1 / (fromIntegral $ (sum xs +1))) 
-
-score :: [Gene] -> IO Float
-score gs = do
-        realScore <- runner'' gs numGames g OTurn
-        return $ toScore realScore
-    where g = mkStdGen 12
-          numGames = 100
-
-runner'' :: (RandomGen g) 
-         => [Gene] 
-         -> Int 
-         -> g 
-         -> Turn 
-         -> IO [Int]
-runner'' _ 0 _ _ = return []
-runner'' gs n g t = do
-        (outcome, g') <- playGame gs newGrid g 0 t
-        outcome' <- runner'' gs (n-1) g' nextT
-        return (outcome:outcome')
-    where newGrid = toState (replicate 9 N)
-          nextT = case t of
-                      XTurn -> OTurn
-                      OTurn -> XTurn
-
-
--- TODO Need bool indicating which mark the genome is playing as.
+-- Play a single game of Tic-Tac-Toe: genome function vs. random playing host.
 playGame :: (RandomGen g) 
-         => (Scenario -> Scenario) -- bot 
-         -> Scenario 
+         => (Scenario -> Scenario) -- genome function 
+         -> Scenario -- current game scenario 
          -> g
+         -> Int -- player being used by genome: 1 or (-1)
          -> IO (Bool, g)
-playGame gnm s g
-    | isWinner s =                  return (True, g) -- TODO(jhibberd) Player X changes from bot to host!
-    | isWinner $ invertPlayers s =  return (False, g) -- See above
+playGame gnm s g gp
+    | isWinner s =                  return (gp == 1, g)
+    | isWinner $ invertPlayers s =  return (gp == (-1), g)
     | isDraw s =                    return (True, g)
     | otherwise = 
-          case (detectPlayer s) of
+          case (detectTurn s == gp) of
 
-              1 -> do
-                  let (s', g') = hostPlay s g
-                  playGame gnm s' g'
-
-              (-1) -> do
+              True -> do
                   let s' = gnm s
-                  if isLegalMove s s'
-                      then playGame gnm s' g
-                      else return (False, g) -- illegal move, so lose the game
+                  if isLegalMove s (traceShow s' s')
+                      then playGame gnm s' g gp
+                      else return (False, traceShow "boo" g) -- illegal move, so lose the game
+
+              False -> do
+                  let (s', g') = hostPlay s g
+                  playGame gnm (traceShow s' s') g' gp
 
 -- | Return whether a change from a 'before' scenario to an 'after' scenario
 -- represents a legal move.
 isLegalMove :: Scenario -> Scenario -> Bool
-isLegalMove before after = --TODO (length $ filter (/=N) grid) == numTurns 
+isLegalMove before after = 
+        case (detectTurn before) of
+            1 ->    numX after == numX before +1 && numO after == numO before
+            (-1) -> numO after == numO before +1 && numX after == numX before
+    where numX = count 1
+          numO = count (-1)
+          count x = length . filter (==x)
+
+-- | Simulate an opponent by playing a random legal move.
+-- TODO Soon to be replaced by an algorithm that plays every possible game.
+hostPlay :: RandomGen g => Scenario -> g -> (Scenario, g)
+hostPlay s g = let (i, g') = randomR (0, length freeonly -1) g
+                   i'' = freeonly !! i
+                   s' = play s i''
+                in (s', g')
+    where zipped = zip s [0..]
+          freeonly = map snd $ filter ((==0) . fst) zipped
+
+main = do
+    let (alleles, g') = mkAlleles (mkStdGen 1)
+        gnm = solve alleles
+    evalFitness gnm g'
+
+--main = return $ score [False, False, True, False]
 
