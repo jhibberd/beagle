@@ -6,8 +6,6 @@ import Data.Maybe
 import Prelude hiding (flip)
 import System.Random
 
-import Debug.Trace
-
 type Scenario = [Int] -- 9-dimensional vector representing game scenario
 type Player = Int -- 1 or (-1)
 
@@ -142,8 +140,6 @@ subsequentScenarios s = let is = immediateScenarios s
                             ss = nub . concat $ map subsequentScenarios is
                         in s:ss
 
---main = print . length $ subsequentScenarios [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
 -- HASH TABLE ------------------------------------------------------------------
 
 type Alleles = [Int]
@@ -180,17 +176,9 @@ solve al scn = let (base, restore) = toBase scn
                    scn'' = restore scn'
                in scn''
 
-{-
-mockAlleles = replicate 627 3
-
-main = do
-    let solve' = solve mockAlleles
-    print $ solve' [1, 0, 0, 0, 0, 0, (-1), 0, 0]
--}
-
 -- RUNNER ----------------------------------------------------------------------
 
-populationSize = 2
+populationSize = 500
 
 -- | Create a list of randomly chosen alleles.
 mkAlleles :: RandomGen g => g -> (Alleles, g)
@@ -235,23 +223,22 @@ search :: RandomGen g
        -> IO Alleles
 search !p !g !gen = do
     ep <- scorePopulation p
+    putStrLn . show . minimum $ map snd ep -- debug
     case (solutions ep) of
         (Just x) -> return x
         Nothing -> do
             (p', g') <- evolve g ep 
             search p' g' (gen+1)
 
---main = print $ mkPopulation (mkStdGen 0)
-
 -- FITNESS EVALUATION ----------------------------------------------------------
 
-numGames = 40 -- TODO(jhibberd) Replace with system that plays all possible games.
+numGames = 200 -- TODO(jhibberd) Replace with system that plays all possible games.
 
 -- | Given a list of outcomes (success/failure) calculate and return a score.
 score :: [Bool] -> Float
-score xs =  (realToFrac total - realToFrac lost) / realToFrac total
+score xs =  (realToFrac total - realToFrac didntLose) / realToFrac total
     where total = length xs
-          lost = length $ filter (==False) xs
+          didntLose = length $ filter (==True) xs
 
 -- | Play n games and return a fitness score based on the aggregated outcomes.
 evalFitness :: RandomGen g 
@@ -285,13 +272,13 @@ playGame gnm s g gp
 
               True -> do
                   let s' = gnm s
-                  if isLegalMove s (traceShow s' s')
+                  if isLegalMove s s'
                       then playGame gnm s' g gp
-                      else return (False, traceShow "boo" g) -- illegal move, so lose the game
+                      else return (False, g) -- illegal move, so lose the game
 
               False -> do
                   let (s', g') = hostPlay s g
-                  playGame gnm (traceShow s' s') g' gp
+                  playGame gnm s' g' gp
 
 -- | Return whether a change from a 'before' scenario to an 'after' scenario
 -- represents a legal move.
@@ -314,15 +301,6 @@ hostPlay s g = let (i, g') = randomR (0, length freeonly -1) g
     where zipped = zip s [0..]
           freeonly = map snd $ filter ((==0) . fst) zipped
 
-{-
-main = do
-    let (alleles, g') = mkAlleles (mkStdGen 1)
-        gnm = solve alleles
-    evalFitness gnm g'
--}
-
---main = return $ score [False, False, True, False]
-
 -- EVOLUTION -------------------------------------------------------------------
 
 -- TODO: Explain this
@@ -341,29 +319,19 @@ evolve :: RandomGen g
        => g
        -> [(Alleles, Float)]
        -> IO ([Alleles], g)
-evolve g xs = let (xs', g') = evolve' xs g
-              in return (take (length xs) xs', g)
+evolve g xs = return $ evolve' xs g populationSize
+    where populationSize = length xs
 
--- TODO Might not be able to resolve this. Might go on forever.
-evolve' xs g = let (f, g') =     probdist dist g
-                   (xs, g'') =   f xs g'
-                   (xs', g''') = evolve' xs g''
-               in (xs:xs', g''')
-
--- TODO: Deprecated?
-{-
-let (xs', g') = case True of
-                                   _ -> listify $ mutate xs g
-                                   --1 -> listify $ replica xs g
-                                   -- 2 -> crossover xs g
-                   (xs'', g'') = evolve' xs g' 
-               in (xs' ++ xs'', g'')
+evolve' _ g 0 = ([], g)
+evolve' xs g n = let (f, g') =      probdist dist g
+                     (x, g'') =     f xs g'
+                     (xs', g''') =  evolve' xs g'' (n-1)
+                 in (x:xs', g''')
     where dist = [
-              (listify $ mutate, pOpMutate),
-              (listify $ replica, pOpReplica),
-              (crossover, pOpCrossover)
+              (mutate,      pOpMutate),
+              (replica,     pOpReplica),
+              (crossover,   pOpCrossover)
               ]
--}
 
 probdist :: RandomGen g => [(a, Float)] -> g -> (a, g)
 probdist dist g = if (sum $ map snd dist) == 1.0 
@@ -377,9 +345,6 @@ probdist dist g = if (sum $ map snd dist) == 1.0
 probdist' :: [(a, Float)] -> Float -> a
 probdist' [] _ = error "Incomplete probability distribution"
 probdist' ((el, p):xs) rp = if rp <= p then el else probdist' xs rp
-
-listify :: (a, b) -> ([a], b)
-listify (a, b) = ([a], b) 
 
 -- | GENETIC OPERATORS ---------------------------------------------------------
 
@@ -460,9 +425,8 @@ lsdrop xs i = let (a, b) = splitAt i xs in a ++ (drop 1 b)
 
 -- MAIN ========================================================================
 
-{-
 main = do 
     let (p, g') = mkPopulation (mkStdGen 0)
     g <- search p g' 1
     print g
--}
+
