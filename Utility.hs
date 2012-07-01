@@ -6,6 +6,15 @@ import Data.Maybe
 import Prelude hiding (flip)
 import System.Random
 
+-- TODO: Explain this
+populationSize =    500
+tournamentSize =    30
+pMutates =          0.01
+pCrossover =        0.05
+pOpMutate =         0.1
+pOpReplica =        0.1
+pOpCrossover =      0.8
+
 type Scenario = [Int] -- 9-dimensional vector representing game scenario
 type Player = Int -- 1 or (-1)
 
@@ -178,8 +187,6 @@ solve al scn = let (base, restore) = toBase scn
 
 -- RUNNER ----------------------------------------------------------------------
 
-populationSize = 500
-
 -- | Create a list of randomly chosen alleles.
 mkAlleles :: RandomGen g => g -> (Alleles, g)
 mkAlleles = mkAlleles' (Map.size buildTable)
@@ -280,6 +287,16 @@ playGame gnm s g gp
                   let (s', g') = hostPlay s g
                   playGame gnm s' g' gp
 
+
+-- | TODO: Attempt to test a genome by playing every possible game.
+{-
+playGame2 :: (Scenario -> Scenario) -- genome function
+          -> Scenario -- current game scenario
+          -> Int -- player being used by gebome: 1 or (-1)
+          -> IO [Bool] -- list of outcomes of all possible games
+playGame2 gnm scn gp = 
+-}
+
 -- | Return whether a change from a 'before' scenario to an 'after' scenario
 -- represents a legal move.
 isLegalMove :: Scenario -> Scenario -> Bool
@@ -303,15 +320,6 @@ hostPlay s g = let (i, g') = randomR (0, length freeonly -1) g
 
 -- EVOLUTION -------------------------------------------------------------------
 
--- TODO: Explain this
-tournamentSize =    30
-pMutates =          0.01
-pCrossover =        0.05
-
-pOpMutate =         0.1
-pOpReplica =        0.1
-pOpCrossover =      0.8
-
 -- | Given a population of genotypes and their observed phenotypes, generate a
 -- new population (generation) that will *probably* or *logically* perform 
 -- better (at exhibiting the target phenotype).
@@ -334,7 +342,7 @@ evolve' xs g n = let (f, g') =      probdist dist g
               ]
 
 probdist :: RandomGen g => [(a, Float)] -> g -> (a, g)
-probdist dist g = if (sum $ map snd dist) == 1.0 
+probdist dist g = if (sum $ map snd dist) == 1.0
                       then let (r, g') = randomR (0.0, 1.0) g
                                cum = tail $ scanl (+) 0 (map snd dist)
                                dist' = zip (map fst dist) cum
@@ -366,7 +374,7 @@ mutate' xs g p m = mapS xs f g
                          False -> (x, g')
 
 crossover :: RandomGen g => [([a], Float)] -> g -> ([a], g)
-crossover pop g = let (parentA, g') =  tournamentSelection pop g
+crossover pop g = let (parentA, g') = tournamentSelection pop g
                       (parentB, g'') = tournamentSelection pop g'
                       (first, g''') =  randomR (False, True) g''
                   in crossover' (zip parentA parentB) g''' first pCrossover
@@ -374,13 +382,12 @@ crossover pop g = let (parentA, g') =  tournamentSelection pop g
 crossover' :: RandomGen g => [(a, a)] -> g -> Bool -> Float -> ([a], g)
 crossover' xs g focus p = let (xs', (g', _)) = mapS xs f (g, focus)
                           in (xs', g')
-    where f x (g, focus) = let (switch, g') = prob p g
+    where f x (g, focus) = let (switch, g') = prob p g 
                                focus' = case switch of
                                             True -> not focus
                                             False -> focus
-                           in case focus of
-                                True -> (fst x, (g', focus'))
-                                False -> (snd x, (g', focus'))
+                               !x' = case focus of True -> fst x; False -> snd x
+                           in (x', (g', focus'))
 
 -- | GENETIC OPERATOR UTILITIES ------------------------------------------------
 
@@ -404,6 +411,7 @@ prob :: RandomGen g => Float -> g -> (Bool, g)
 prob p g = let (x, g') = randomR (0.0, 1.0) g
            in ((x <= p), g')
 
+-- | TODO
 mapS :: [a] -> (a -> s -> (b, s)) -> s -> ([b], s)
 mapS [] _ s = ([], s)
 mapS (x:xs) f s = let (x', s') =    f x s
