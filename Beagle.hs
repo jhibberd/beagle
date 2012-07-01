@@ -1,5 +1,15 @@
 {-# LANGUAGE BangPatterns #-}
 
+-- TODO: Replace with "export all"
+{-
+module Beagle
+    ( score
+    , play
+    , playGame
+    , Scenario
+    ) where
+-}
+
 import Data.List
 import qualified Data.Map as Map
 import Data.Maybe
@@ -7,13 +17,20 @@ import Prelude hiding (flip)
 import System.Random
 
 -- TODO: Explain this
-populationSize =    500
-tournamentSize =    30
-pMutates =          0.01
-pCrossover =        0.05
+populationSize =    1000
+tournamentSize =    50
+pMutates =          0.005
+pCrossover =        0.15
 pOpMutate =         0.1
 pOpReplica =        0.1
 pOpCrossover =      0.8
+
+-- TODO: By playing an illegal move a whole tree of possible games is not
+-- included in the evaluation of a scenario. This restricts the feedback
+-- available to the GA and makes successful evolution harder. Try doing a mod
+-- of the "move to play" over the available spaces in a scenario. This way
+-- no bad move will every be played so a certain set of functions can be 
+-- removed.
 
 type Scenario = [Int] -- 9-dimensional vector representing game scenario
 type Player = Int -- 1 or (-1)
@@ -32,8 +49,20 @@ maybePlay s i
 --
 -- The player is detected from the marks already present in the scenario. See
 -- 'detectTurn'.
+{-
 play :: Scenario -> Int -> Scenario
 play s i = let (x, _:xs) = splitAt i s in x ++ (detectTurn s:xs)
+-}
+
+-- TODO: New play
+play :: Scenario -> Int -> Scenario
+play scn i = play scn (freeIdx !! idx)
+    where scnIdx = zip scn [(0::Int)..]
+          freeIdx = map snd $ filter (\x -> fst x == 0) scnIdx
+          idx = i `mod` (length freeIdx)
+          modifyScn i' = let (x, _:xs) = splitAt i' scn 
+                         in x ++ (detectTurn scn:xs)
+
 
 -- | Return whether a scenario represents a game that ended in a draw.
 isDraw :: Scenario -> Bool
@@ -53,6 +82,7 @@ isWinner [_, _, 1, _, 1, _, 1, _, _] = True
 isWinner _ = False
 
 -- | Replace all player X (1) marks with player O (-1) marks. Useful when using
+
 -- 'isWinner'.
 invertPlayers :: Scenario -> Scenario
 invertPlayers = map (\x -> case x of 1 -> (-1); (-1) -> 1; x -> x)
@@ -239,8 +269,6 @@ search !p !g !gen = do
 
 -- FITNESS EVALUATION ----------------------------------------------------------
 
---numGames = 200 -- TODO(jhibberd) Replace with system that plays all possible games.
-
 -- | Given a list of outcomes (success/failure) calculate and return a score.
 score :: [Bool] -> Float
 score xs =  (realToFrac total - realToFrac didntLose) / realToFrac total
@@ -254,62 +282,17 @@ evalFitness gnm = do
         outcomes <- evalFitness' gnm
         return (score outcomes)
     where evalFitness' gnm = do
-              xFst <- playGame2 gnm 1 emptyScenario
-              xSnd <- playGame2 gnm (-1) emptyScenario
+              xFst <- playGame gnm 1 emptyScenario
+              xSnd <- playGame gnm (-1) emptyScenario
               return (xFst++xSnd)
           emptyScenario = replicate 9 0
 
-{-
-evalFitness :: RandomGen g 
-            => (Scenario -> Scenario) -- genome function 
-            -> g 
-            -> IO Float
-evalFitness gnm g = do 
-        outcomes <- evalFitness' gnm numGames g
-        return (score outcomes)
-    where evalFitness' gnm 0 _ = return []
-          evalFitness' gnm n g = do
-              (x, g') <- playGame gnm emptyScenario g (getPlayer n)
-              xs <- evalFitness' gnm (n-1) g'
-              return (x:xs)
-          getPlayer n = case (odd n) of True -> 1; False -> (-1)
-          emptyScenario = replicate 9 0
--}
-
-{-
--- Play a single game of Tic-Tac-Toe: genome function vs. random playing host.
-playGame :: (RandomGen g) 
-         => (Scenario -> Scenario) -- genome function 
-         -> Scenario -- current game scenario 
-         -> g
-         -> Int -- player being used by genome: 1 or (-1)
-         -> IO (Bool, g)
-playGame gnm s g gp
-    | isWinner s =                  return (gp == 1, g)
-    | isWinner $ invertPlayers s =  return (gp == (-1), g)
-    | isDraw s =                    return (True, g)
-    | otherwise = 
-          case (detectTurn s == gp) of
-
-              True -> do
-                  let s' = gnm s
-                  if isLegalMove s s'
-                      then playGame gnm s' g gp
-                      else return (False, g) -- illegal move, so lose the game
-
-              False -> do
-                  let (s', g') = hostPlay s g
-                  playGame gnm s' g' gp
--}
-
--- WIP -------------------------------------------------------------------------
--- Attempt to test a genome by playing every possible game.
-
-playGame2 :: (Scenario -> Scenario) -- genome function
-          -> Int -- player being used by gebome: 1 or (-1)
-          -> Scenario -- current game scenario
-          -> IO [Bool] -- list of outcomes of all possible games
-playGame2 gnm gp scn 
+-- TODO: Explain and rename to playGame
+playGame :: (Scenario -> Scenario) -- genome function
+         -> Int -- player being used by gebome: 1 or (-1)
+         -> Scenario -- current game scenario
+         -> IO [Bool] -- list of outcomes of all possible games
+playGame gnm gp scn 
     | isWinner scn =                    return [gp == 1]
     | isWinner $ invertPlayers scn =    return [gp == (-1)]
     | isDraw scn =                      return [True]
@@ -319,17 +302,15 @@ playGame2 gnm gp scn
             True -> do -- genome play
                 let scn' = gnm scn
                 if isLegalMove scn scn'
-                    then playGame2 gnm gp scn'
+                    then playGame gnm gp scn'
                     else return [False] -- illegal move, so lose the game
 
             False -> do -- host play
-                fmap concat . sequence $ map (playGame2 gnm gp) (allLegalMoves scn)
+                fmap concat . sequence $ map (playGame gnm gp) (allLegalMoves scn)
 
 -- | Return all legal moves that the player, whose turn it is next, can play.
 allLegalMoves :: Scenario -> [Scenario]
 allLegalMoves scn = filter (isLegalMove scn) $ map (play scn) [0..8]
-
--- END -------------------------------------------------------------------------
 
 -- | Return whether a change from a 'before' scenario to an 'after' scenario
 -- represents a legal move.
@@ -341,16 +322,6 @@ isLegalMove before after =
     where numX = count 1
           numO = count (-1)
           count x = length . filter (==x)
-
--- | Simulate an opponent by playing a random legal move.
--- TODO Soon to be replaced by an algorithm that plays every possible game.
-hostPlay :: RandomGen g => Scenario -> g -> (Scenario, g)
-hostPlay s g = let (i, g') = randomR (0, length freeonly -1) g
-                   i'' = freeonly !! i
-                   s' = play s i''
-                in (s', g')
-    where zipped = zip s [0..]
-          freeonly = map snd $ filter ((==0) . fst) zipped
 
 -- EVOLUTION -------------------------------------------------------------------
 
@@ -471,3 +442,4 @@ main = do
     let (p, g') = mkPopulation (mkStdGen 0)
     g <- search p g' 1
     print g
+
