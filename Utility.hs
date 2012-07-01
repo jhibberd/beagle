@@ -210,7 +210,7 @@ scorePopulation :: [Alleles] -> IO [(Alleles, Float)]
 scorePopulation = fmap sort . sequence . map score
     where sort = sortBy (\a b -> compare (snd a) (snd b))
           score x = do
-              s <- evalFitness (solve x) (mkStdGen 2) -- TODO bad!
+              s <- evalFitness (solve x)
               return (x, s)
 
 -- | Given a list of alleles and their fitnes scores, return the first genotype
@@ -239,7 +239,7 @@ search !p !g !gen = do
 
 -- FITNESS EVALUATION ----------------------------------------------------------
 
-numGames = 200 -- TODO(jhibberd) Replace with system that plays all possible games.
+--numGames = 200 -- TODO(jhibberd) Replace with system that plays all possible games.
 
 -- | Given a list of outcomes (success/failure) calculate and return a score.
 score :: [Bool] -> Float
@@ -248,6 +248,18 @@ score xs =  (realToFrac total - realToFrac didntLose) / realToFrac total
           didntLose = length $ filter (==True) xs
 
 -- | Play n games and return a fitness score based on the aggregated outcomes.
+evalFitness :: (Scenario -> Scenario) -- genome function 
+            -> IO Float
+evalFitness gnm = do 
+        outcomes <- evalFitness' gnm
+        return (score outcomes)
+    where evalFitness' gnm = do
+              xFst <- playGame2 gnm 1 emptyScenario
+              xSnd <- playGame2 gnm (-1) emptyScenario
+              return (xFst++xSnd)
+          emptyScenario = replicate 9 0
+
+{-
 evalFitness :: RandomGen g 
             => (Scenario -> Scenario) -- genome function 
             -> g 
@@ -262,7 +274,9 @@ evalFitness gnm g = do
               return (x:xs)
           getPlayer n = case (odd n) of True -> 1; False -> (-1)
           emptyScenario = replicate 9 0
+-}
 
+{-
 -- Play a single game of Tic-Tac-Toe: genome function vs. random playing host.
 playGame :: (RandomGen g) 
          => (Scenario -> Scenario) -- genome function 
@@ -286,16 +300,36 @@ playGame gnm s g gp
               False -> do
                   let (s', g') = hostPlay s g
                   playGame gnm s' g' gp
-
-
--- | TODO: Attempt to test a genome by playing every possible game.
-{-
-playGame2 :: (Scenario -> Scenario) -- genome function
-          -> Scenario -- current game scenario
-          -> Int -- player being used by gebome: 1 or (-1)
-          -> IO [Bool] -- list of outcomes of all possible games
-playGame2 gnm scn gp = 
 -}
+
+-- WIP -------------------------------------------------------------------------
+-- Attempt to test a genome by playing every possible game.
+
+playGame2 :: (Scenario -> Scenario) -- genome function
+          -> Int -- player being used by gebome: 1 or (-1)
+          -> Scenario -- current game scenario
+          -> IO [Bool] -- list of outcomes of all possible games
+playGame2 gnm gp scn 
+    | isWinner scn =                    return [gp == 1]
+    | isWinner $ invertPlayers scn =    return [gp == (-1)]
+    | isDraw scn =                      return [True]
+    | otherwise =
+        case (detectTurn scn == gp) of
+
+            True -> do -- genome play
+                let scn' = gnm scn
+                if isLegalMove scn scn'
+                    then playGame2 gnm gp scn'
+                    else return [False] -- illegal move, so lose the game
+
+            False -> do -- host play
+                fmap concat . sequence $ map (playGame2 gnm gp) (allLegalMoves scn)
+
+-- | Return all legal moves that the player, whose turn it is next, can play.
+allLegalMoves :: Scenario -> [Scenario]
+allLegalMoves scn = filter (isLegalMove scn) $ map (play scn) [0..8]
+
+-- END -------------------------------------------------------------------------
 
 -- | Return whether a change from a 'before' scenario to an 'after' scenario
 -- represents a legal move.
@@ -437,4 +471,3 @@ main = do
     let (p, g') = mkPopulation (mkStdGen 0)
     g <- search p g' 1
     print g
-
