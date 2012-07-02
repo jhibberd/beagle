@@ -23,8 +23,8 @@ tests = test [
     --[False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 1, (-1), (-1), (-1), 1, (-1), 1, 1]),
     --[False, True] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 1, 0, 1, (-1), 1, 1, (-1), (-1)]),
     --[True] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, (-1), 1, 1, (-1), (-1)]),
-    --[False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, (-1), 1, (-1), 1, (-1)])
-    --[False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, 0, 0, (-1), 1, (-1)])
+    --[False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, (-1), 1, (-1), 1, (-1)]),
+    [False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, 0, 0, (-1), 1, (-1)]),
 
     [1, 0, 0, 0, 0, 0, 0, 0, 0] ~=? play [0, 0, 0, 0, 0, 0, 0, 0, 0] 0,
     [1, (-1), 0, 0, 0, 0, 0, 0, 0] ~=? play [1, 0, 0, 0, 0, 0, 0, 0, 0] 0,
