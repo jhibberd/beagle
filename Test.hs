@@ -9,7 +9,7 @@ import System.IO.Unsafe
 rand = mkStdGen 1
 
 mockGenome :: Scenario -> Scenario
-mockGenome scn = play scn 0
+mockGenome scn = play' scn 0
 
 tests = test [
     --'a'  ~=? (fst $ tournamentSelection [('a', 3), ('b', 5)] 2 rand),
@@ -24,14 +24,17 @@ tests = test [
     --[False, True] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 1, 0, 1, (-1), 1, 1, (-1), (-1)]),
     --[True] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, (-1), 1, 1, (-1), (-1)]),
     --[False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, (-1), 1, (-1), 1, (-1)]),
-    [False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, 0, 0, (-1), 1, (-1)]),
+    --[False, False] ~=? (unsafePerformIO $ playGame mockGenome 1 [0, 0, 0, 1, 0, 0, (-1), 1, (-1)]),
 
-    [1, 0, 0, 0, 0, 0, 0, 0, 0] ~=? play [0, 0, 0, 0, 0, 0, 0, 0, 0] 0,
-    [1, (-1), 0, 0, 0, 0, 0, 0, 0] ~=? play [1, 0, 0, 0, 0, 0, 0, 0, 0] 0,
-    [1, (-1), 1, (-1), (-1), 0, 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 0,
-    [1, (-1), 1, (-1), 0, (-1), 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 1,
-    [1, (-1), 1, (-1), (-1), 0, 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 2
+    --[1, 0, 0, 0, 0, 0, 0, 0, 0] ~=? play [0, 0, 0, 0, 0, 0, 0, 0, 0] 0,
+    --[1, (-1), 0, 0, 0, 0, 0, 0, 0] ~=? play [1, 0, 0, 0, 0, 0, 0, 0, 0] 0,
+    --[1, (-1), 1, (-1), (-1), 0, 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 0,
+    --[1, (-1), 1, (-1), 0, (-1), 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 1,
+    --[1, (-1), 1, (-1), (-1), 0, 1, (-1), 1] ~=? play [1, (-1), 1, (-1), 0, 0, 1, (-1), 1] 2,
 
+    333222121 ~=? toKey [(-1),0,(-1),0,0,0,1,1,1],
+    [0,0,0,0,(-1),0,1,0,1] ~=? (fst $ toBase [1,0,1,0,(-1),0,0,0,0]),
+    [0,0,0,0,(-1),0,1,0,1] ~=? (fst $ toBase [0,0,0,0,(-1),0,1,0,1])
 
     --"ABCDEFGhijkLMNOpqRStuvwxYZ" ~=? (fst $ crossover' (zip ['a'..'z'] ['A'..'Z']) rand False 0.2),
     --"ABCDEFGHIJKLMNOPQRSTUVWXYZ" ~=? (fst $ crossover' (zip ['a'..'z'] ['A'..'Z']) rand False 0.0),

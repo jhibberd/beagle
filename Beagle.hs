@@ -12,9 +12,9 @@ import Debug.Trace
 
 -- TODO: Explain this
 populationSize =    600
-tournamentSize =    20
-pMutates =          0.005
-pCrossover =        0.15
+tournamentSize =    10
+pMutates =          0.0005
+pCrossover =        0.10
 pOpMutate =         0.1
 pOpReplica =        0.1
 pOpCrossover =      0.8
@@ -83,7 +83,7 @@ toBase = getBase . variants
 -- picking the one with the lowest hash - and is sufficient; we just need an
 -- arbitrary but deterministic member of the varitions to act as the base.
 getBase :: Ord a => [(a, b)] -> (a, b)
-getBase = head . sortBy (\(a, x) (b, y) -> compare a b) 
+getBase = head . sortBy (\(a, _) (b, _) -> compare a b) 
 
 -- | Return whether a scenario represents a completed game (ie. there has been
 -- a win or draw).
@@ -205,6 +205,7 @@ scorePopulation :: [Alleles] -> IO [(Alleles, Float)]
 scorePopulation = fmap sort . sequence . map score
     where sort = sortBy (\a b -> compare (snd a) (snd b))
           score x = do
+              appendFile "/tmp/genomes.log" (show x)
               s <- evalFitness (solve x)
               return (x, s)
 
