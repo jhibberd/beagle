@@ -11,13 +11,13 @@ import System.Random
 import Debug.Trace
 
 -- TODO: Explain this
-populationSize =    600
+populationSize =    500
 tournamentSize =    10
-pMutates =          0.0005
-pCrossover =        0.10
-pOpMutate =         0.1
-pOpReplica =        0.1
-pOpCrossover =      0.8
+pMutates =          0.0001
+pCrossover =        0.1
+pOpMutate =         0.05
+pOpReplica =        0.05
+pOpCrossover =      0.9
 
 type Scenario = [Int] -- 9-dimensional vector representing game scenario
 type Player = Int -- 1 or (-1)
@@ -153,6 +153,10 @@ toKey :: Scenario -> Int
 toKey g = foldr f 0 (zip [0..] (allPositive g))
     where f (i, x) b = b + (x * (10 ^ i))
           allPositive = map (\x -> case x of (-1) -> 1; 0 -> 2; 1 -> 3)
+
+-- | Convert a key to a scenario. Used by the player module.
+fromKey :: Int -> Scenario
+fromKey = reverse . map (\x -> case x of '1' -> (-1); '2' -> 0; '3' -> 1) . show
 
 -- | Build a table of gene index positions, keyed by base scenarios.
 buildTable :: Map.Map Int Int
