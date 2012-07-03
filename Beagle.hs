@@ -8,8 +8,6 @@ import Data.Maybe
 import Prelude hiding (flip)
 import System.Random
 
-import Debug.Trace
-
 -- TODO: Explain this
 populationSize =    500
 tournamentSize =    10
@@ -241,7 +239,7 @@ search !p !g !gen = do
 
 -- | Given a list of outcomes (success/failure) calculate and return a score.
 score :: [Bool] -> Float
-score xs = let x = (realToFrac total - realToFrac didntLose) / realToFrac total in trace (show didntLose ++ "/" ++ show total) x
+score xs = (realToFrac total - realToFrac didntLose) / realToFrac total
     where total = length xs
           didntLose = length $ filter (==True) xs
 
@@ -263,8 +261,8 @@ playGame :: (Scenario -> Scenario) -- genome function
          -> Scenario -- current game scenario
          -> IO [Bool] -- list of outcomes of all possible games
 playGame gnm gp scn 
-    | isWinner scn =                    return [if gp == 1 then True else traceShow scn False]
-    | isWinner $ invertPlayers scn =    return [if gp == (-1) then True else traceShow scn False]
+    | isWinner scn =                    return [gp == 1]
+    | isWinner $ invertPlayers scn =    return [gp == (-1)]
     | isDraw scn =                      return [True]
     | otherwise =
         case (detectTurn scn == gp) of

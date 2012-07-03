@@ -40,11 +40,11 @@ class GameHandler(tornado.web.RequestHandler):
 application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/game", GameHandler),
-], debug=True)
+], static_path="static", debug=True)
 
 if __name__ == "__main__":
     application.listen(8888)
-    #Thread(target=proxy, args=(q, )).start()
+    Thread(target=proxy, args=(q, )).start()
     try:
         tornado.ioloop.IOLoop.instance().start()
     except KeyboardInterrupt:
