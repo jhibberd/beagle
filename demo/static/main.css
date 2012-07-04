@@ -1,3 +1,5 @@
+/* GAME ----------------------------------------------------------------------*/
+
 body {
     margin: 20px;
     font-family: sans-serif;
@@ -50,4 +52,10 @@ h1 {
 .grid .cell-right {
     border-left: solid 1px #333;
     border-right: solid 3px #333;
+}
+
+/* GRAPH ---------------------------------------------------------------------*/
+
+.rule {
+    font-size: 11px;
 }

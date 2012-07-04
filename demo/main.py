@@ -30,6 +30,11 @@ class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render('index.html')
 
+class PHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        self.render('population.csv')
+
 class GameHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
@@ -40,6 +45,7 @@ class GameHandler(tornado.web.RequestHandler):
 application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/game", GameHandler),
+    (r"/population.csv", PHandler),
 ], static_path="static", debug=True)
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+// GAME ------------------------------------------------------------------------
 
 // The current game scenario expressed as a string where:
 // 
@@ -165,3 +166,128 @@ function askComputerToMove() {
     });
 }
 
+// GRAPH -----------------------------------------------------------------------
+
+var dataset = [
+    0.30472103,
+    0.29411766,
+    0.27192983,
+    0.25945947,
+    0.20053476,
+    0.17475729,
+    0.15656565,
+    0.12690355,
+    0.10497238,
+    7.8341015e-2,
+    4.1237112e-2,
+    3.5353534e-2,
+    2.4630541e-2,
+    2.116402e-2,
+    1.6393442e-2,
+    1.1428571e-2,
+    1.010101e-2,
+    5.1282053e-3,
+    5.1020407e-3,
+    4.784689e-3,
+    0.0
+    ]
+
+var h = 250,                                    // Graph height
+    padBot = 20,                                // Bottom margin
+    padLft = 35,                                // Left margin
+    padTop = 10,                                // Top margin
+    barW = 20,                                  // Data bar width
+    w = padLft + ((barW+1) * dataset.length),   // Graph width
+    maxY = .4;                                  // Max. shown y value
+
+$(document).ready(function() {
+
+    var svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", w)
+        .attr("height", h);
+
+    // Y-axis
+    function toY(x) {
+        return (h-padBot) - (x * ((h-padBot-padTop) / maxY));
+    }
+    svg.selectAll("line")
+        .data([0, .1, .2, .3, .4].map(toY))
+        .enter().append("line")
+        .attr("x1", padLft-7)
+        .attr("x2", w)
+        .attr("y1", function(d) {
+            return d;
+        })
+        .attr("y2", function(d) {
+            return d;
+        })
+        .style("stroke", "#ddd");
+    svg.selectAll(".rule")
+        .data([0, .1, .2, .3, .4])
+        .enter().append("text")
+        .attr("class", "rule")
+        .attr("x", 0)
+        .attr("y", toY)
+        .attr("dy", +3)
+        .attr("text-anchor", "right")
+        .text(function (d) {
+            return String(d3.format('%')(d));
+        });
+
+    // X-axis
+    var yLabel = Array();
+    for (i=0; i<21; i++) {
+        yLabel[i] = i+1;
+    }
+    svg.selectAll(".rule2")
+        .data(yLabel)
+        .enter().append("text")
+        .attr("class", "rule")
+        .attr("x", function(x) {
+            return padLft - (barW/2) + (x * (barW+1));
+        })
+        .attr("y", h)
+        .attr("dy", -5)
+        .attr("text-anchor", "middle")
+        .text(String);
+    svg.append("line")
+        .attr("x1", padLft)
+        .attr("x2", padLft+((barW+1) * dataset.length))
+        .attr("y1", h-padBot)
+        .attr("y2", h-padBot)
+        .style("stroke", "#000");
+
+    // Data
+    var initData = Array();
+    for (i=0; i<21; i++) {
+        initData[i] = 0;
+    }
+    svg.selectAll("rect")
+       .data(initData)
+       .enter()
+       .append("rect")
+       .attr("x", function(d, i) {
+            return padLft + (i * (barW+1));
+        })
+        .attr("y", function(d) {
+            return (h-padBot) - (d * ((h-padBot-padTop) / maxY));
+        })
+        .attr("height", function(d) {
+            return d * ((h-padBot-padTop) / maxY);
+        })
+       .attr("width", barW);
+
+    // Animation
+    svg.selectAll("rect")
+        .data(dataset)
+        .transition()
+        .duration(750)
+        .attr("height", function(d) {
+            return d * ((h-padBot) / maxY);
+        })
+        .attr("y", function(d) {
+            return (h-padBot) - (d * ((h-padBot) / maxY));
+        });
+
+});
