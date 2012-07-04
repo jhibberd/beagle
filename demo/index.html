@@ -3,61 +3,7 @@
         <title>A genetically evolved perfect Tic-Tac-Toe player</title>
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript"></script>
         <script src="{{ static_url('main.js') }}" type="text/javascript"></script>
-        <style>
-            body {
-                margin: 20px;
-                font-family: sans-serif;
-            }
-            h1 {
-                font-size: 40px;
-            }
-            .dna {
-                width: 100%;
-                font-size: 12px;
-                font-family: Courier New, Courier New, monospace;
-            }
-            .grid {
-                float: left;
-            }
-            .grid .cell {
-                width: 60px;
-                height: 60px;
-                float: left;
-                text-align: center;
-                font-family: Courier New, Courier New, monospace;
-            }
-            .grid .cell-o {
-                font-size: 70px;
-                line-height: 50px;
-            }
-            .grid .cell-x {
-                font-size: 80px;
-                line-height: 60px;
-            }
-            .grid .cell-free {
-                cursor: pointer;
-            }
-            .grid .cell-free:hover {
-                background-color: #eee;
-            }
-            .grid .cell-top {
-                border-top: solid 3px #333;
-                border-bottom: solid 1px #333;
-            }
-            .grid .cell-bottom {
-                border-bottom: solid 3px #333;
-                border-top: solid 1px #333;
-            }
-            .grid .cell-left {
-                border-right: solid 1px #333;
-                border-left: solid 3px #333;
-                clear: left;
-            }
-            .grid .cell-right {
-                border-left: solid 1px #333;
-                border-right: solid 3px #333;
-            }
-        </style>
+        <link rel="stylesheet" type="text/css" href="{{ static_url('main.css') }}" />
     </head>
     <body>
         <h1>A genetically evolved perfect Tic-Tac-Toe player</h1>

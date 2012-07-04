@@ -11,7 +11,7 @@ from Queue import Queue, Empty
 STOP=False
 
 def proxy(queue):
-    p = Popen(['./Player'], shell=False, stdin=PIPE, stdout=PIPE)
+    p = Popen(['../Player'], shell=False, stdin=PIPE, stdout=PIPE)
     while True:
         try:
             scenario, handler = queue.get(timeout=3)
@@ -28,7 +28,7 @@ q = Queue()
 class MainHandler(tornado.web.RequestHandler):
 
     def get(self):
-        self.render('html/index.html')
+        self.render('index.html')
 
 class GameHandler(tornado.web.RequestHandler):
 
