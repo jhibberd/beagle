@@ -1,59 +1,121 @@
+"""Web server that provides interactive demo page.
+
+Usage: 
+
+    python main.py [port]
+
+"""
+
+import errno
+import httplib
+import sys
 import tornado.ioloop
 import tornado.web
 
-# Experimental
-
-import sys
 from subprocess import PIPE, Popen
 from threading  import Thread
 from Queue import Queue, Empty
 
-STOP=False
+class ComputerPlayerDaemon(object):
+    """Daemon that maintains a queue of game scenarios and allows the computer
+    player (running as a separate process) to respond to them.
+    """
+   
+    # Number of attempts that will be made (per request) to get a response
+    # from the separate computer player process before the request is aborted.
+    ATTEMPTS = 3
 
-def proxy(queue):
-    p = Popen(['../Player'], shell=False, stdin=PIPE, stdout=PIPE)
-    while True:
-        try:
-            scenario, handler = queue.get(timeout=3)
-        except Empty:
-            if STOP: return
-            else: continue
-        p.stdin.write(scenario+'\n')
-        x = p.stdout.readline()
-        handler.write(x)
-        handler.finish()
+    # Number of seconds to wait on the queue for a new scenario before checking
+    # the 'stop_signal' flag.
+    TIMEOUT = 3
 
-q = Queue()
+    # Set to True to shutdown the daemon. 
+    stop_signal = False
+    
+    # Queue of game scenarios awaiting response.
+    q = Queue()
+
+    @classmethod
+    def stop(cls):
+        """Signal to the daemon that it needs to shut itself down."""
+        cls.stop_signal = True
+
+    @classmethod
+    def put(cls, scenario, handler):
+        """Add a scenario (and its request handler) to the queue."""
+        cls.q.put((scenario, handler))
+
+    @classmethod
+    def start(cls):
+        player = cls.connect()
+        while True:
+
+            # Block on queue, waiting for next scenario to respond to. 
+            # Periodically checking to see if the 'stop_signal' has been set.
+            try:
+                scenario, handler = cls.q.get(timeout=cls.TIMEOUT)
+            except Empty:
+                if cls.stop_signal:     return
+                else:                   continue
+
+            # Attempt to get a response to the scenario from the computer
+            # player. If the connection to the computer player has been broken
+            # an attempt will be made to reestablish it (but only a finite
+            # number of times).
+            for _ in range(cls.ATTEMPTS):
+
+                try:
+                    player.stdin.write(scenario+'\n')
+                except IOError as e:
+                    if e.errno == errno.EPIPE:
+                        print "Connection to player went down."
+                        player = cls.connect()
+                        continue
+                    else:
+                        raise
+
+                response = player.stdout.readline()
+                handler.write(response)
+                handler.finish()
+                break
+
+            else:
+                print "Connection to player couldn't be established."
+                handler.send_error(status_code=httplib.SERVICE_UNAVAILABLE)
+
+    @staticmethod
+    def connect():
+        """Create a new computer player process and establish a connection to
+        it's stdin and stdout channels.
+        """
+        return Popen(['../Player'], shell=False, stdin=PIPE, stdout=PIPE)
+
 
 class MainHandler(tornado.web.RequestHandler):
-
+    """Handler to return single HTML page."""
     def get(self):
         self.render('index.html')
 
-class PHandler(tornado.web.RequestHandler):
-
-    def get(self):
-        self.render('population.csv')
 
 class GameHandler(tornado.web.RequestHandler):
-
+    """Handler to allow computer player to respond to game scenarios."""
     @tornado.web.asynchronous
     def get(self):
         scenario = self.get_argument('q')
-        q.put((scenario, self))
+        ComputerPlayerDaemon.put(scenario, self)
 
-application = tornado.web.Application([
-    (r"/", MainHandler),
-    (r"/game", GameHandler),
-    (r"/population.csv", PHandler),
-], static_path="static", debug=True)
 
 if __name__ == "__main__":
-    application.listen(8888)
-    Thread(target=proxy, args=(q, )).start()
+    application = tornado.web.Application([
+        (r"/",      MainHandler),
+        (r"/game",  GameHandler),
+        ], 
+        static_path="static", 
+        debug=True) # TODO: REMOVE THIS BEFORE RELEASE -------------------------
+    application.listen(port=int(sys.argv[1]))
+    Thread(target=ComputerPlayerDaemon.start).start()
     try:
         tornado.ioloop.IOLoop.instance().start()
     except KeyboardInterrupt:
-        STOP=True
+        ComputerPlayerDaemon.stop()
         raise
-
