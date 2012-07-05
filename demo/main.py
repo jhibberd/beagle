@@ -8,6 +8,7 @@ Usage:
 
 import errno
 import httplib
+import re
 import sys
 import tornado.ioloop
 import tornado.web
@@ -28,6 +29,10 @@ class ComputerPlayerDaemon(object):
     # Number of seconds to wait on the queue for a new scenario before checking
     # the 'stop_signal' flag.
     TIMEOUT = 3
+
+    # Game state returned from the computer player process if the scenario 
+    # is illegal.
+    ILLEGAL_STATE = '4'
 
     # Set to True to shutdown the daemon. 
     stop_signal = False
@@ -74,9 +79,14 @@ class ComputerPlayerDaemon(object):
                     else:
                         raise
 
+                # Check that the computer player didn't reject the scenario
+                # as illegal.
                 response = player.stdout.readline()
-                handler.write(response)
-                handler.finish()
+                if response[0] == cls.ILLEGAL_STATE:
+                    handler.send_error(status_code=httplib.BAD_REQUEST)
+                else: 
+                    handler.write(response)
+                    handler.finish()
                 break
 
             else:
@@ -99,10 +109,16 @@ class MainHandler(tornado.web.RequestHandler):
 
 class GameHandler(tornado.web.RequestHandler):
     """Handler to allow computer player to respond to game scenarios."""
+
+    validator = re.compile('[123]{9}$')
+
     @tornado.web.asynchronous
     def get(self):
         scenario = self.get_argument('q')
-        ComputerPlayerDaemon.put(scenario, self)
+        if self.validator.match(scenario):  
+            ComputerPlayerDaemon.put(scenario, self)
+        else:
+            self.send_error(status_code=httplib.BAD_REQUEST)
 
 
 if __name__ == "__main__":
@@ -110,8 +126,7 @@ if __name__ == "__main__":
         (r"/",      MainHandler),
         (r"/game",  GameHandler),
         ], 
-        static_path="static", 
-        debug=True) # TODO: REMOVE THIS BEFORE RELEASE -------------------------
+        static_path="static") 
     application.listen(port=int(sys.argv[1]))
     Thread(target=ComputerPlayerDaemon.start).start()
     try:
