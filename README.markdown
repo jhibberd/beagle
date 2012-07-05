@@ -1,6 +1,5 @@
-__Beagle__ is an attempt to create a [genetic algorithm](http://en.wikipedia.org/wiki/Genetic_algorithm)
-that given a set of block functions will compose these blocks in a sequence that
-solves a particular task. 
+__Beagle__ is a [genetic algorithm](http://en.wikipedia.org/wiki/Genetic_algorithm)
+that evolves the perfect Tic-Tac-Toe player.
 
-It's possible to solve this problem using sequential or randomised brute force,
-however this algorithm strives for a more "intelligent" solution.
+See:
+[http://199.101.48.101/](http://199.101.48.101/)
