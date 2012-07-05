@@ -41,35 +41,25 @@ $(document).ready(function() {
 });
 
 function renderScenario() {
-    for (i=0; i<9; i++) {
-        var cell = $('#cell_'+i.toString());
-        process(cell, scenario[i]);
-        cell.html(map(scenario[i]));
-    }
-}
-
-// TODO: Implement this as a dict?
-function map(x) {
-    switch (x) {
-        case '1': return 'o';
-        case '2': return '';
-        case '3': return '&times;';
-    }
-}
-
-function process(cell, x) {
-    switch (x) {
-        case '1':
-            cell.removeClass('cell-free');
-            cell.addClass('cell-o');
-            cell.off('click');
-            break;
-        case '3': 
-            cell.removeClass('cell-free');
-            cell.addClass('cell-x');
-            cell.off('click');
-            break;
-    }
+    $('.cell').each(function() {
+        var idx = getCellIdx($(this));
+        switch (scenario[idx]) {
+            case PositionState.O:
+                $(this)
+                    .removeClass('cell-free')
+                    .addClass('cell-o')
+                    .html('o')
+                    .off('click');
+                break;
+            case PositionState.X: 
+                $(this)
+                    .removeClass('cell-free')
+                    .addClass('cell-x')
+                    .html('&times;')
+                    .off('click');
+                break;
+        }
+    });
 }
 
 // Render the game read-only. Typically in response to the game scenario 
@@ -94,26 +84,25 @@ function resetGame() {
         scenario[i] = PositionState.FREE;
     }
 
-    // TODO: Might need to sort out click handlers stacking up.
-    // TODO: Chain these up and use 'each'.
-    // TODO: Could this be part of 'renderScenario'?
-    for (i=0; i<9; i++) {
-        var cell = $('#cell_'+i.toString());
-        cell.removeClass('cell-x');
-        cell.removeClass('cell-o');
-        cell.addClass('cell-free');
-        cell.empty();
-        cell.click(function() {
-            userMove(getCellIdx($(this)));
+    // Return all game cells to starting values.
+    $('.cell').each(function() {
+        $(this)
+            .removeClass('cell-x')
+            .removeClass('cell-o')
+            .addClass('cell-free')
+            .empty()
+            .off('click')
+            .click(function() {
+                userMove(getCellIdx($(this)));
             });
-    }
+    });
 
     if (!userIsX) {
         askComputerToMove();
     }
 }
 
-// TODO
+// Given a game cell DOM object return its index within the game (0-8).
 function getCellIdx(cell) {
     return parseInt(cell.attr('id').split('_')[1]);
 }
@@ -168,54 +157,56 @@ function askComputerToMove() {
 
 // GRAPH -----------------------------------------------------------------------
 
-var dataset = [
-    0.30472103,
-    0.29411766,
-    0.27192983,
-    0.25945947,
-    0.20053476,
-    0.17475729,
-    0.15656565,
-    0.12690355,
-    0.10497238,
-    7.8341015e-2,
-    4.1237112e-2,
-    3.5353534e-2,
-    2.4630541e-2,
-    2.116402e-2,
-    1.6393442e-2,
-    1.1428571e-2,
-    1.010101e-2,
-    5.1282053e-3,
-    5.1020407e-3,
-    4.784689e-3,
-    0.0
-    ]
-
-var h = 250,                                    // Graph height
-    padBot = 20,                                // Bottom margin
-    padLft = 35,                                // Left margin
-    padTop = 10,                                // Top margin
-    barW = 20,                                  // Data bar width
-    w = padLft + ((barW+1) * dataset.length),   // Graph width
-    maxY = .4;                                  // Max. shown y value
-
 $(document).ready(function() {
+
+    // Percentage of games (out of all possible Tic-Tac-Toe games) that was 
+    // lost by the best candidate in each generation.
+    var dataset = [
+        0.30472103,
+        0.29411766,
+        0.27192983,
+        0.25945947,
+        0.20053476,
+        0.17475729,
+        0.15656565,
+        0.12690355,
+        0.10497238,
+        7.8341015e-2,
+        4.1237112e-2,
+        3.5353534e-2,
+        2.4630541e-2,
+        2.116402e-2,
+        1.6393442e-2,
+        1.1428571e-2,
+        1.010101e-2,
+        5.1282053e-3,
+        5.1020407e-3,
+        4.784689e-3,
+        0.0
+        ];
+
+    var h = 250,            // Graph height
+        padBot = 20,        // Bottom margin
+        padLft = 35,        // Left margin
+        padTop = 10,        // Top margin
+        barW = 20,          // Data bar width
+        maxY = .4;          // Max. shown y value
 
     var svg = d3.select("#chart")
         .append("svg")
-        .attr("width", w)
+        .attr("width", padLft+((barW+1)*dataset.length))
         .attr("height", h);
 
     // Y-axis
-    function toY(x) {
-        return (h-padBot) - (x * ((h-padBot-padTop) / maxY));
+    var yAxisData = [0, .1, .2, .3, .4];
+    function toYAxisCoord(x) {
+        return (h-padBot)-(x*((h-padBot-padTop)/maxY));
     }
     svg.selectAll("line")
-        .data([0, .1, .2, .3, .4].map(toY))
+        .data(yAxisData.map(toYAxisCoord))
         .enter().append("line")
         .attr("x1", padLft-7)
-        .attr("x2", w)
+        .attr("x2", padLft+((barW+1)*dataset.length))
         .attr("y1", function(d) {
             return d;
         })
@@ -224,11 +215,11 @@ $(document).ready(function() {
         })
         .style("stroke", "#ddd");
     svg.selectAll(".rule")
-        .data([0, .1, .2, .3, .4])
+        .data(yAxisData)
         .enter().append("text")
         .attr("class", "rule")
         .attr("x", 0)
-        .attr("y", toY)
+        .attr("y", toYAxisCoord)
         .attr("dy", +3)
         .attr("text-anchor", "right")
         .text(function (d) {
@@ -237,7 +228,7 @@ $(document).ready(function() {
 
     // X-axis
     var yLabel = Array();
-    for (i=0; i<21; i++) {
+    for (i=0; i<dataset.length; i++) {
         yLabel[i] = i+1;
     }
     svg.selectAll(".rule2")
@@ -245,7 +236,7 @@ $(document).ready(function() {
         .enter().append("text")
         .attr("class", "rule")
         .attr("x", function(x) {
-            return padLft - (barW/2) + (x * (barW+1));
+            return padLft-(barW/2)+(x*(barW+1));
         })
         .attr("y", h)
         .attr("dy", -5)
@@ -253,14 +244,14 @@ $(document).ready(function() {
         .text(String);
     svg.append("line")
         .attr("x1", padLft)
-        .attr("x2", padLft+((barW+1) * dataset.length))
+        .attr("x2", padLft+((barW+1)*dataset.length))
         .attr("y1", h-padBot)
         .attr("y2", h-padBot)
         .style("stroke", "#000");
 
     // Data
     var initData = Array();
-    for (i=0; i<21; i++) {
+    for (i=0; i<dataset.length; i++) {
         initData[i] = 0;
     }
     svg.selectAll("rect")
@@ -268,15 +259,15 @@ $(document).ready(function() {
        .enter()
        .append("rect")
        .attr("x", function(d, i) {
-            return padLft + (i * (barW+1));
+            return padLft+(i*(barW+1));
         })
         .attr("y", function(d) {
-            return (h-padBot) - (d * ((h-padBot-padTop) / maxY));
+            return (h-padBot)-(d*((h-padBot-padTop)/maxY));
         })
         .attr("height", function(d) {
-            return d * ((h-padBot-padTop) / maxY);
+            return d*((h-padBot-padTop)/maxY);
         })
-       .attr("width", barW);
+        .attr("width", barW);
 
     // Animation
     svg.selectAll("rect")
@@ -284,10 +275,10 @@ $(document).ready(function() {
         .transition()
         .duration(750)
         .attr("height", function(d) {
-            return d * ((h-padBot) / maxY);
+            return d*((h-padBot)/maxY);
         })
         .attr("y", function(d) {
-            return (h-padBot) - (d * ((h-padBot) / maxY));
+            return (h-padBot)-(d*((h-padBot)/maxY));
         });
 
 });
