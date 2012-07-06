@@ -2,6 +2,7 @@ import Beagle
 import System.Random
 
 main = do 
-    let (p, g') = mkPopulation (mkStdGen 0)
-    g <- search p g' 1
+    setStdGen (mkStdGen 0)
+    p <- mkPopulation
+    g <- search p 1
     print g

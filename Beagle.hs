@@ -190,20 +190,22 @@ solve al scn = let (base, restore) = toBase scn
 -- RUNNER ----------------------------------------------------------------------
 
 -- | Create a list of randomly chosen alleles.
-mkAlleles :: RandomGen g => g -> (Alleles, g)
+mkAlleles :: IO Alleles
 mkAlleles = mkAlleles' (Map.size buildTable)
-    where mkAlleles' 0 g = ([], g)
-          mkAlleles' n g = let (x, g') = randomR (0, 8) g
-                               (xs, g'') = mkAlleles' (n-1) g'
-                           in (x:xs, g'')
+    where mkAlleles' 0 = return []
+          mkAlleles' n = do
+                x <- randomRIO (0,8)
+                xs <- mkAlleles' (n-1)
+                return (x:xs)
 
 -- | Generation a population of random alleles.
-mkPopulation :: RandomGen g => g -> ([Alleles], g)
-mkPopulation !g = mkPopulation' populationSize g
-    where mkPopulation' 0 !g = ([], g)
-          mkPopulation' n !g = let (x, g') = mkAlleles g
-                                   (xs, g'') = mkPopulation' (n-1) g'
-                               in (x:xs, g'') 
+mkPopulation :: IO [Alleles]
+mkPopulation = mkPopulation' populationSize
+    where mkPopulation' 0 = return []
+          mkPopulation' n = do
+                x <- mkAlleles
+                xs <- mkPopulation' (n-1)
+                return (x:xs) 
 
 -- | Evaluate the fitness of each individual in the population.
 --
@@ -225,19 +227,17 @@ solutions xs =
 
 -- Given a seed population, intelligently evolve the population until an 
 -- individual exhibits the target behaviour.
-search :: RandomGen g 
-       => [Alleles] 
-       -> g
+search :: [Alleles] 
        -> Int -- generation
        -> IO Alleles
-search !p !g !gen = do
+search !p !gen = do
     ep <- scorePopulation p
     putStrLn . show . minimum $ map snd ep -- debug
     case (solutions ep) of
         (Just x) -> return x
         Nothing -> do
-            (p', g') <- evolve g ep 
-            search p' g' (gen+1)
+            p' <- evolve ep 
+            search p' (gen+1)
 
 -- FITNESS EVALUATION ----------------------------------------------------------
 
@@ -288,32 +288,32 @@ allLegalMoves scn = toBases $ map (play scn) [0..8]
 -- | Given a population of genotypes and their observed phenotypes, generate a
 -- new population (generation) that will *probably* or *logically* perform 
 -- better (at exhibiting the target phenotype).
-evolve :: RandomGen g
-       => g
-       -> [(Alleles, Float)]
-       -> IO ([Alleles], g)
-evolve g xs = return $ evolve' xs g populationSize
+evolve :: [(Alleles, Float)]
+       -> IO [Alleles]
+evolve xs = evolve' xs populationSize
     where populationSize = length xs
 
-evolve' _ g 0 = ([], g)
-evolve' xs g n = let (f, g') =      probdist dist g
-                     (x, g'') =     f xs g'
-                     (xs', g''') =  evolve' xs g'' (n-1)
-                 in (x:xs', g''')
+evolve' _ 0 = return []
+evolve' xs n = do
+                     f <- probdist dist
+                     x <- f xs
+                     xs' <- evolve' xs (n-1)
+                     return (x:xs')
     where dist = [
               (mutate,      pOpMutate),
               (replica,     pOpReplica),
               (crossover,   pOpCrossover)
               ]
 
-probdist :: RandomGen g => [(a, Float)] -> g -> (a, g)
-probdist dist g = if (sum $ map snd dist) == 1.0
-                      then let (r, g') = randomR (0.0, 1.0) g
-                               cum = tail $ scanl (+) 0 (map snd dist)
-                               dist' = zip (map fst dist) cum
-                               outcome = probdist' dist' r
-                           in (outcome, g')
-                      else error "Incomplete probability distribution"
+probdist :: [(a, Float)] -> IO a
+probdist dist
+    | (sum $ map snd dist) == 1.0 = do
+                      r <- randomRIO (0.0, 1.0)
+                      let cum = tail $ scanl (+) 0 (map snd dist)
+                          dist' = zip (map fst dist) cum
+                          outcome = probdist' dist' r
+                      return outcome
+    | otherwise = error "Incomplete probability distribution"
 
 probdist' :: [(a, Float)] -> Float -> a
 probdist' [] _ = error "Incomplete probability distribution"
@@ -322,37 +322,62 @@ probdist' ((el, p):xs) rp = if rp <= p then el else probdist' xs rp
 -- | GENETIC OPERATORS ---------------------------------------------------------
 
 -- | Replicate an individual (unchanged) to the next generation.
-replica :: RandomGen g => [([a], Float)] -> g -> ([a], g)
+replica :: [([a], Float)] -> IO [a]
 replica = tournamentSelection
 
 -- | TODO Mutate n randomly chosen genes of a genotype to prevent the population
 -- from iteratively converging around a small subset of all available genes.
-mutate :: RandomGen g => [(Alleles, Float)] -> g -> (Alleles, g)
-mutate pop g = let (individual, g') = tournamentSelection pop g
-               in mutate' individual g' pMutates (randomR (0, 8))
+mutate :: [(Alleles, Float)] -> IO Alleles
+mutate pop = do
+                individual <- tournamentSelection pop
+                mutate' individual
 
-mutate' :: RandomGen g => [a] -> g -> Float -> (g -> (a, g)) -> ([a], g)
-mutate' xs g p m = mapS xs f g
-    where f x g = let (outcome, g') = prob p g
-                  in case outcome of
-                         True ->  m g'
-                         False -> (x, g')
+mutate' :: Alleles -> IO Alleles
+mutate' [] = return []
+mutate' (x:xs) = do
+    outcome <- prob pMutates
+    x' <- case outcome of
+            True -> randomRIO (0,8)
+            False -> return x
+    xs' <- mutate' xs
+    return (x':xs')
+{-
+mutate' xs = mapS xs f
+    where f x = do
+                 outcome <- prob pMutates
+                 case outcome of
+                         True ->  randomRIO (0, 8) 
+                         False -> return x
+-}
 
-crossover :: RandomGen g => [([a], Float)] -> g -> ([a], g)
-crossover pop g = let (parentA, g') =  tournamentSelection pop g
-                      (parentB, g'') = tournamentSelection pop g'
-                      (first, g''') =  randomR (False, True) g''
-                  in crossover' (zip parentA parentB) g''' first pCrossover
+crossover :: [([a], Float)] -> IO [a]
+crossover pop = do
+                       parentA <-  tournamentSelection pop
+                       parentB <- tournamentSelection pop
+                       first <- randomRIO (False, True)
+                       crossover' (zip parentA parentB) first
 
-crossover' :: RandomGen g => [(a, a)] -> g -> Bool -> Float -> ([a], g)
-crossover' xs g focus p = let (xs', (g', _)) = mapS xs f (g, focus)
-                          in (xs', g')
-    where f x (g, focus) = let (switch, g') = prob p g 
-                               focus' = case switch of
-                                            True -> not focus
-                                            False -> focus
-                               !x' = case focus of True -> fst x; False -> snd x
-                           in (x', (g', focus'))
+crossover' :: [(a, a)] -> Bool -> IO [a]
+crossover' [] _ = return []
+crossover' ((a, b):xs) focus = do
+    let !x' = if focus then a else b 
+    switch <- prob pCrossover
+    let focus' = if switch then not focus else focus
+    xs' <- crossover' xs focus'
+    return (x':xs')
+
+{-
+crossover' xs focus = do 
+                        (xs', _) <- mapS xs f focus -- TODO: dominant
+                        return xs'
+    where f x focus = do
+                        switch <- prob pCrossover
+                        let focus' = case switch of
+                                         True -> not focus
+                                         False -> focus
+                            !x' = case focus of True -> fst x; False -> snd x
+                        return (x', focus')
+-}
 
 -- | GENETIC OPERATOR UTILITIES ------------------------------------------------
 
@@ -361,10 +386,10 @@ crossover' xs g focus p = let (xs', (g', _)) = mapS xs f (g, focus)
 -- 
 -- If the tournament size is large, weak individuals have a smaller chance of
 -- being selected.
-tournamentSelection :: RandomGen g => [([a], Float)] -> g -> ([a], g)
-tournamentSelection ps g = let (sample, g') = choice ps tournamentSize g
-                               p = fst . head $ sortSnd sample
-                           in (p, g')
+tournamentSelection :: [([a], Float)] -> IO [a]
+tournamentSelection ps = do
+                            sample <- choice ps tournamentSize
+                            return (fst . head $ sortSnd sample)
 
 -- | Sort a list of tuples by its second element.
 sortSnd :: Ord b => [(a, b)] -> [(a, b)]
@@ -372,23 +397,26 @@ sortSnd = sortBy (\a b -> compare (snd a) (snd b))
 
 -- | Given an event probability and pseudo random number generator return 
 -- whether the event "happened".
-prob :: RandomGen g => Float -> g -> (Bool, g)
-prob p g = let (x, g') = randomR (0.0, 1.0) g
-           in ((x <= p), g')
+prob :: Float -> IO Bool
+prob p = do
+        x <- randomRIO (0.0, 1.0)
+        return (x <= p)
 
 -- | TODO
-mapS :: [a] -> (a -> s -> (b, s)) -> s -> ([b], s)
-mapS [] _ s = ([], s)
-mapS (x:xs) f s = let (x', s') =    f x s
-                      (xs', s'') =  mapS xs f s'
-                  in (x':xs', s'')
+mapS :: [a] -> (a -> IO b) -> IO [b]
+mapS [] _ = return []
+mapS (x:xs) f = do
+                    x' <- f x
+                    xs' <- mapS xs f
+                    return (x':xs')
 
 -- | Return n random elements from a list.
-choice :: RandomGen g => [a] -> Int -> g -> ([a], g)
-choice _ 0 g = ([], g)
-choice xs n g = let (ri, g') =   randomR range g
-                    (xs', g'') = choice (lsdrop xs ri) (n-1) g'
-                in ((xs !! ri):xs', g'')
+choice :: [a] -> Int -> IO [a]
+choice _ 0 = return []
+choice xs n = do
+                ri <- randomRIO range
+                xs' <- choice (lsdrop xs ri) (n-1)
+                return ((xs !! ri):xs')
     where range = (0, (length xs)-1)
 
 -- | Remove element at a specific index position from a list.
