@@ -3,6 +3,6 @@ import System.Random
 
 main = do 
     setStdGen (mkStdGen 0)
-    p <- mkPopulation
-    g <- search p 1
-    print g
+    p <- seedPopulation
+    t <- search p
+    print t
