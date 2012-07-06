@@ -11,7 +11,7 @@ Eg:
 
 import Beagle
 import Control.Monad
-import Data.Map as Map
+import qualified Data.Map as Map
 import System.IO
 
 -- | Computer player function that responds to game scenarions.
@@ -45,6 +45,11 @@ isIllegal scn = let base = fst $ toBase scn
                 in case Map.lookup (toKey base) buildTable of
                     Just _ ->   False
                     Nothing ->  True
+
+-- | Convert a key to a scenario.
+fromKey :: Int -> Scenario
+fromKey = reverse . map (\x -> case x of '1' -> (-1); '2' -> 0; '3' -> 1) . 
+          show
 
 -- | The "computer" will play a response to a scenario, provided that the 
 -- scenario represents an active game.
