@@ -353,7 +353,6 @@ solutions as = case (map fst . filter (\x -> snd x == 0) $ as) of
 search :: [Alleles] -> IO Alleles
 search !as = do
     sas <- scorePopulation as
-    putStrLn . show . minimum $ map snd sas -- debug
     case (solutions sas) of
         (Just a) -> return a
         Nothing -> do
