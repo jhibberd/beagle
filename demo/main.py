@@ -8,6 +8,7 @@ Usage:
 
 import errno
 import httplib
+import os
 import re
 import sys
 import tornado.ioloop
@@ -126,7 +127,7 @@ if __name__ == "__main__":
         (r"/",      MainHandler),
         (r"/game",  GameHandler),
         ], 
-        static_path="static") 
+        static_path=os.path.join(os.path.dirname(__file__), "static")) 
     application.listen(port=int(sys.argv[1]))
     Thread(target=ComputerPlayerDaemon.start).start()
     try:
